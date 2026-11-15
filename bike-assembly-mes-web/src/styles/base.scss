@@ -1,0 +1,241 @@
+/* =====================================================================
+   CALIBRE · Base
+   ===================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  min-width: 320px;
+  height: 100%;
+}
+
+html {
+  background: var(--lux-porcelain-100);
+}
+
+body {
+  margin: 0;
+  color: var(--lux-text);
+  font-family: var(--lux-font-ui);
+  font-size: 13px;
+  line-height: 1.65;
+  background: var(--lux-porcelain-100);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+figure,
+blockquote,
+dl,
+dd {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: var(--lux-gold-700);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--lux-text-strong);
+}
+
+img,
+svg,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--lux-gold-500);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: var(--lux-ink-950);
+  background: rgb(198 169 110 / 48%);
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cec5b3;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b7ab94;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* ---------- Typography utilities ---------- */
+.lux-serif {
+  font-family: var(--lux-font-display);
+}
+
+.lux-data {
+  font-family: var(--lux-font-data);
+  font-variant-numeric: tabular-nums;
+}
+
+.mono-num {
+  font-family: var(--lux-font-data);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.text-muted {
+  color: var(--lux-text-faint) !important;
+}
+
+.text-secondary {
+  color: var(--lux-text-muted) !important;
+}
+
+.text-ellipsis {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-nowrap {
+  white-space: nowrap;
+}
+
+/* ---------- Micro label / kicker ---------- */
+.lux-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--lux-gold-600);
+  font-family: var(--lux-font-data);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.lux-kicker--muted {
+  color: var(--lux-text-faint);
+}
+
+.lux-kicker--light {
+  color: var(--lux-gold-400);
+}
+
+.lux-kicker .lux-dot {
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+/* ---------- Hairline rule ---------- */
+.lux-rule {
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, var(--lux-gold-500), transparent);
+}
+
+/* ---------- Screen reader only ---------- */
+.sr-only {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+/* ---------- Motion ---------- */
+@keyframes lux-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lux-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(63 143 121 / 34%);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgb(63 143 121 / 0%);
+  }
+}
+
+@keyframes lux-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.lux-fade-up {
+  animation: lux-fade-up 0.24s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

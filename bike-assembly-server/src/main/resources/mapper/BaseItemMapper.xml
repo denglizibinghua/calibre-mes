@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bikeassembly.mapper.BaseItemMapper">
+
+    <!-- 基础 CRUD 已由 MyBatis-Plus BaseMapper 提供，此处只写自定义查询 -->
+
+    <!-- 跨表检查物料被外键引用的次数 -->
+    <select id="countReferences" resultType="int">
+        SELECT COUNT(*) FROM (
+            SELECT 1 FROM base_bom WHERE item_id = #{itemId}
+            UNION ALL
+            SELECT 1 FROM base_route WHERE item_id = #{itemId}
+            UNION ALL
+            SELECT 1 FROM pro_work_order WHERE item_id = #{itemId}
+            UNION ALL
+            SELECT 1 FROM wms_inventory WHERE item_id = #{itemId}
+        ) t
+    </select>
+
+</mapper>

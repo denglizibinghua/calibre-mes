@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bikeassembly.mapper.BaseProcessMapper">
+
+    <!-- 基础 CRUD 已由 MyBatis-Plus BaseMapper 提供，此处只写自定义查询 -->
+
+    <select id="countReferences" resultType="int">
+        SELECT COUNT(*) FROM (
+            SELECT 1 FROM pro_work_process WHERE process_id = #{processId}
+            UNION ALL
+            SELECT 1 FROM qms_inspection_item WHERE process_id = #{processId}
+            UNION ALL
+            SELECT 1 FROM qms_inspection WHERE process_id = #{processId}
+            UNION ALL
+            SELECT 1 FROM qms_defect WHERE process_id = #{processId}
+        ) t
+    </select>
+
+</mapper>

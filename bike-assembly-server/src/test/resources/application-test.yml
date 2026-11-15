@@ -1,0 +1,28 @@
+# 测试环境配置：禁用 RabbitMQ + 开发数据库 + 自动初始化认证安全 Schema
+app:
+  rabbitmq:
+    enabled: false
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/bike_assembly_mes?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false&allowMultiQueries=true
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:123456}
+  sql:
+    init:
+      mode: never
+
+bike:
+  jwt:
+    admin:
+      secret-key: test-admin-secret-for-integration-tests-only
+    app:
+      secret-key: test-app-secret-for-integration-tests-only
+
+wechat:
+  miniapp:
+    secret: test-wechat-secret-placeholder

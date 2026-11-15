@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bikeassembly.mapper.QmsInspectionMapper">
+
+    <!-- 列表与扫码计数共用同一读取权限范围，且绝不从客户端接收这些授权参数。 -->
+    <sql id="appReadScope">
+        <if test="!viewAll">
+            AND (qi.inspector_user_id = #{userId}
+                 OR (wo.assignee_user_id = #{userId} AND qi.inspector_user_id IS NULL)
+                 <if test="includePending">
+                     OR (qi.status = '0' AND qi.inspector_user_id IS NULL)
+                 </if>)
+        </if>
+    </sql>
+
+    <select id="selectAppPageByCondition" resultType="com.bikeassembly.entity.QmsInspection">
+        SELECT qi.* FROM qms_inspection qi
+        INNER JOIN pro_work_order wo ON wo.work_order_id = qi.work_order_id
+        <where>
+            <include refid="appReadScope"/>
+            <if test="pendingOnly">AND qi.status = '0' AND qi.inspector_user_id IS NULL</if>
+            <if test="workOrderId != null">AND qi.work_order_id = #{workOrderId}</if>
+            <if test="processId != null">AND qi.process_id = #{processId}</if>
+            <if test="status != null">AND qi.status = #{status}</if>
+        </where>
+        ORDER BY qi.inspection_time DESC, qi.inspection_id DESC
+    </select>
+
+    <select id="countAppPending" resultType="long">
+        SELECT COUNT(*) FROM qms_inspection qi
+        INNER JOIN pro_work_order wo ON wo.work_order_id = qi.work_order_id
+        WHERE qi.work_order_id = #{workOrderId} AND qi.status = '0'
+        <include refid="appReadScope"/>
+    </select>
+
+    <!-- 基础 CRUD 已由 MyBatis-Plus BaseMapper 提供，此处只写自定义查询 -->
+
+    <select id="countReferences" resultType="int">
+        SELECT COUNT(*) FROM (
+            SELECT 1 FROM qms_defect WHERE inspection_id = #{inspectionId}
+        ) t
+    </select>
+
+    <select id="selectListByCondition" resultType="com.bikeassembly.entity.QmsInspection">
+        SELECT qi.*
+        FROM qms_inspection qi
+        LEFT JOIN pro_work_order wo ON wo.work_order_id = qi.work_order_id
+        LEFT JOIN base_item bi ON bi.item_id = wo.item_id
+        <where>
+            <if test="inspectionNo != null and inspectionNo != ''">
+                AND qi.inspection_no LIKE concat('%', #{inspectionNo}, '%')
+            </if>
+            <if test="itemName != null and itemName != ''">
+                AND bi.item_name LIKE concat('%', #{itemName}, '%')
+            </if>
+            <if test="inspector != null and inspector != ''">
+                AND qi.inspector LIKE concat('%', #{inspector}, '%')
+            </if>
+        </where>
+        ORDER BY qi.inspection_time DESC
+    </select>
+
+    <select id="selectPageByCondition" resultType="com.bikeassembly.entity.QmsInspection">
+        SELECT qi.*
+        FROM qms_inspection qi
+        LEFT JOIN pro_work_order wo ON wo.work_order_id = qi.work_order_id
+        LEFT JOIN base_item bi ON bi.item_id = wo.item_id
+        <where>
+            <if test="inspectionNo != null and inspectionNo != ''">
+                AND qi.inspection_no LIKE concat('%', #{inspectionNo}, '%')
+            </if>
+            <if test="itemName != null and itemName != ''">
+                AND bi.item_name LIKE concat('%', #{itemName}, '%')
+            </if>
+            <if test="inspector != null and inspector != ''">
+                AND qi.inspector LIKE concat('%', #{inspector}, '%')
+            </if>
+            <if test="inspectorUserId != null">
+                <choose>
+                    <!-- scope=mine：已分配给我的 + 未分配待领取的 -->
+                    <when test="includePending == true">
+                        AND (qi.inspector_user_id = #{inspectorUserId}
+                             OR (qi.status = '0' AND qi.inspector_user_id IS NULL))
+                    </when>
+                    <!-- scope=pending：仅未分配待领取的 -->
+                    <otherwise>
+                        AND qi.inspector_user_id = #{inspectorUserId}
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="isPending != null and isPending == true">
+                AND qi.status = '0'
+                AND qi.inspector_user_id IS NULL
+            </if>
+            <if test="processRecordId != null">
+                AND qi.process_record_id = #{processRecordId}
+            </if>
+        </where>
+        ORDER BY qi.inspection_time DESC
+    </select>
+
+</mapper>

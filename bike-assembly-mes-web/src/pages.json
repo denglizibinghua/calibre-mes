@@ -1,0 +1,100 @@
+{
+  "pages": [
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "登录",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/account-bind/index",
+      "style": {
+        "navigationBarTitleText": "账号绑定",
+        "navigationStyle": "default"
+      }
+    },
+    {
+      "path": "pages/security-block/index",
+      "style": {
+        "navigationBarTitleText": "安全提醒",
+        "navigationStyle": "default"
+      }
+    },
+    {
+      "path": "pages/home/index",
+      "style": {
+        "navigationBarTitleText": "自行车组装MES",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/profile/index",
+      "style": {
+        "navigationBarTitleText": "我的",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/work-order/index",
+      "style": {
+        "navigationBarTitleText": "我的工单",
+        "navigationStyle": "default",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/work-order/detail",
+      "style": {
+        "navigationBarTitleText": "工单详情",
+        "navigationStyle": "default"
+      }
+    },
+    {
+      "path": "pages/work-process/index",
+      "style": {
+        "navigationBarTitleText": "工序报工",
+        "navigationStyle": "default"
+      }
+    },
+    {
+      "path": "pages/inspection/index",
+      "style": {
+        "navigationBarTitleText": "质量检验",
+        "navigationStyle": "default",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/andon/index",
+      "style": {
+        "navigationBarTitleText": "安灯告警",
+        "navigationStyle": "default"
+      }
+    },
+    {
+      "path": "pages/repair/index",
+      "style": {
+        "navigationBarTitleText": "设备报修",
+        "navigationStyle": "default",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/inventory/index",
+      "style": {
+        "navigationBarTitleText": "库存查询",
+        "navigationStyle": "default",
+        "enablePullDownRefresh": true
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "自行车组装MES",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f3f6fb"
+  }
+}

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bikeassembly.mapper.SysUserMapper">
+
+    <!-- 基础 CRUD（insert/update/delete/selectById/selectPage）已由 MyBatis-Plus BaseMapper 自动提供 -->
+
+    <!--
+      [数据库操作] 根据微信 openid 查询用户。
+      被调用方：SysUserServiceImpl.wxLogin（微信小程序登录）
+      查询表：sys_user
+    -->
+    <select id="findByOpenid" resultType="com.bikeassembly.entity.SysUser">
+        SELECT
+            user_id, username, password, nickname, phone, role_id,
+            openid, avatar, status,
+            password_changed_at, password_expire_at, must_change_password,
+            login_fail_count, locked_until, last_login_time, last_login_ip,
+            create_time, update_time
+        FROM sys_user
+        WHERE openid = #{openid}
+        LIMIT 1
+    </select>
+
+    <!--
+      [数据库操作] 根据用户名查询用户（明确列出所有列，避免 SELECT * 的歧义）。
+      被调用方：SysUserServiceImpl.login（管理端登录）、SysUserServiceImpl.appLogin（App 端登录）
+      查询表：sys_user
+    -->
+    <select id="findByUsername" resultType="com.bikeassembly.entity.SysUser">
+        SELECT
+            user_id, username, password, nickname, phone, role_id,
+            openid, avatar, status,
+            password_changed_at, password_expire_at, must_change_password,
+            login_fail_count, locked_until, last_login_time, last_login_ip,
+            create_time, update_time
+        FROM sys_user
+        WHERE username = #{username}
+        LIMIT 1
+    </select>
+
+    <select id="selectDepartmentRootUnitId" resultType="long">
+        WITH RECURSIVE unit_chain AS (
+            SELECT u.unit_id, u.parent_id, u.unit_type
+            FROM sys_user su
+            JOIN base_work_unit u ON u.unit_id = su.work_unit_id
+            WHERE su.user_id = #{userId}
+            UNION ALL
+            SELECT parent.unit_id, parent.parent_id, parent.unit_type
+            FROM base_work_unit parent
+            JOIN unit_chain child ON child.parent_id = parent.unit_id
+        )
+        SELECT unit_id
+        FROM unit_chain
+        WHERE unit_type = 'D' OR parent_id = 0
+        ORDER BY CASE WHEN unit_type = 'D' THEN 0 ELSE 1 END
+        LIMIT 1
+    </select>
+
+</mapper>

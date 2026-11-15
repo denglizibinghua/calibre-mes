@@ -1,0 +1,205 @@
+/* =====================================================================
+   CALIBRE · Design Tokens
+   黑曜石 / 瓷白 / 香槟金 —— 精密制造美学
+   ===================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* ---------- Obsidian shell ---------- */
+  --lux-ink-950: #070a0f;
+  --lux-ink-900: #0b0f15;
+  --lux-ink-800: #11161f;
+  --lux-ink-700: #1a212c;
+  --lux-ink-600: #2a3341;
+  --lux-shell-line: rgb(198 169 110 / 14%);
+  --lux-shell-line-strong: rgb(198 169 110 / 26%);
+  --lux-shell-text: #ede8dc;
+  --lux-shell-muted: #8b857a;
+
+  /* ---------- Porcelain workspace ---------- */
+  --lux-porcelain-50: #faf8f3;
+  --lux-porcelain-100: #f3efe6;
+  --lux-porcelain-200: #eae4d8;
+  --lux-porcelain-300: #d9d2c2;
+  --lux-surface: #fffdf9;
+  --lux-surface-soft: #f8f5ee;
+
+  /* ---------- Champagne gold ---------- */
+  --lux-gold-300: #e2cd9e;
+  --lux-gold-400: #d2b77f;
+  --lux-gold-500: #c6a96e;
+  --lux-gold-600: #a8894f;
+  --lux-gold-700: #866a3b;
+
+  /* ---------- Status ---------- */
+  --lux-jade-600: #2f6f5d;
+  --lux-jade-500: #3f8f79;
+  --lux-jade-400: #55a98f;
+  --lux-jade-50: #edf6f1;
+  --lux-jade-line: #cfe6dc;
+
+  --lux-ember-600: #8f5a20;
+  --lux-ember-500: #b8752e;
+  --lux-ember-50: #fbf4e6;
+  --lux-ember-line: #ebd9b4;
+
+  --lux-wine-600: #85333c;
+  --lux-wine-500: #a8454f;
+  --lux-wine-50: #faedee;
+  --lux-wine-line: #ebcfd3;
+
+  --lux-neutral-600: #565148;
+  --lux-neutral-500: #6f6a5f;
+  --lux-neutral-50: #f4f2ed;
+  --lux-neutral-line: #dfd9cc;
+
+  /* ---------- Text & lines ---------- */
+  --lux-text-strong: #14181f;
+  --lux-text: #2a2f38;
+  --lux-text-soft: #3c414a;
+  --lux-text-muted: #6f6a5f;
+  --lux-text-faint: #9a9487;
+  --lux-line: #e3ddd0;
+  --lux-line-soft: #efe9dd;
+  --lux-line-strong: #cfc7b6;
+
+  /* ---------- Typography ---------- */
+  --lux-font-display: 'Noto Serif SC', 'Source Han Serif SC', Georgia, serif;
+  --lux-font-ui: 'Noto Sans SC', Inter, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --lux-font-data: Bahnschrift, 'DIN Alternate', 'Roboto Condensed', Consolas, monospace;
+
+  /* ---------- Geometry ---------- */
+  --lux-radius-xs: 2px;
+  --lux-radius-sm: 3px;
+  --lux-radius-md: 4px;
+  --lux-radius-lg: 6px;
+
+  /* ---------- Elevation ---------- */
+  --lux-shadow-page: 0 1px 2px rgb(35 28 15 / 4%), 0 24px 48px -36px rgb(35 28 15 / 28%);
+  --lux-shadow-pop: 0 16px 40px rgb(20 16 8 / 14%);
+  --lux-shadow-dialog: 0 30px 90px rgb(7 10 15 / 35%);
+  --lux-shadow-button: 0 1px 0 rgb(255 255 255 / 35%) inset, 0 6px 14px rgb(120 94 44 / 18%);
+
+  /* ---------- Legacy MES aliases (kept for existing pages) ---------- */
+  --mes-primary: var(--lux-gold-600);
+  --mes-primary-hover: var(--lux-gold-700);
+  --mes-primary-soft: #f5efe2;
+  --mes-bg-page: var(--lux-porcelain-100);
+  --mes-bg-soft: var(--lux-surface-soft);
+  --mes-bg-card: var(--lux-surface);
+  --mes-text-primary: var(--lux-text-strong);
+  --mes-text-secondary: var(--lux-text);
+  --mes-text-muted: var(--lux-text-muted);
+  --mes-text-placeholder: var(--lux-text-faint);
+  --mes-border: var(--lux-line);
+  --mes-border-light: var(--lux-line-soft);
+  --mes-radius-sm: var(--lux-radius-xs);
+  --mes-radius-md: var(--lux-radius-sm);
+  --mes-radius-lg: var(--lux-radius-md);
+  --mes-radius-xl: var(--lux-radius-lg);
+  --mes-shadow-xs: 0 1px 2px rgb(35 28 15 / 4%);
+  --mes-shadow-sm: 0 1px 2px rgb(35 28 15 / 4%), 0 14px 28px -22px rgb(35 28 15 / 24%);
+  --mes-shadow-md: var(--lux-shadow-pop);
+  --mes-header-height: 64px;
+  --mes-sidebar-width: 258px;
+  --mes-sidebar-collapsed-width: 78px;
+  --mes-transition-fast: 0.16s ease;
+  --mes-transition: 0.22s ease;
+
+  /* ---------- Element Plus mapping ---------- */
+  --el-color-white: #ffffff;
+  --el-color-black: #000000;
+  --el-color-primary: #8c6f42;
+  --el-color-primary-light-3: #ae9470;
+  --el-color-primary-light-5: #c6b39a;
+  --el-color-primary-light-7: #ded3c4;
+  --el-color-primary-light-8: #e9e1d5;
+  --el-color-primary-light-9: #f4efe7;
+  --el-color-primary-dark-2: #70592f;
+
+  --el-color-success: #3f8f79;
+  --el-color-success-light-3: #6fae9d;
+  --el-color-success-light-5: #9ac7bb;
+  --el-color-success-light-7: #c2ded6;
+  --el-color-success-light-8: #d8eae5;
+  --el-color-success-light-9: #eef6f2;
+  --el-color-success-dark-2: #2f6f5d;
+
+  --el-color-warning: #b8752e;
+  --el-color-warning-light-3: #cf9a69;
+  --el-color-warning-light-5: #ddb697;
+  --el-color-warning-light-7: #ead3c0;
+  --el-color-warning-light-8: #f1e1d4;
+  --el-color-warning-light-9: #fbf4e9;
+  --el-color-warning-dark-2: #8f5a20;
+
+  --el-color-danger: #a8454f;
+  --el-color-error: #a8454f;
+  --el-color-danger-light-3: #c17981;
+  --el-color-danger-light-5: #d29fa5;
+  --el-color-danger-light-7: #e2c4c8;
+  --el-color-danger-light-8: #ebd7da;
+  --el-color-danger-light-9: #faedee;
+  --el-color-danger-dark-2: #85333c;
+  --el-color-error-light-3: #c17981;
+  --el-color-error-light-5: #d29fa5;
+  --el-color-error-light-7: #e2c4c8;
+  --el-color-error-light-8: #ebd7da;
+  --el-color-error-light-9: #faedee;
+  --el-color-error-dark-2: #85333c;
+
+  --el-color-info: #6f6a5f;
+  --el-color-info-light-3: #999489;
+  --el-color-info-light-5: #b4afa5;
+  --el-color-info-light-7: #cfcbc4;
+  --el-color-info-light-8: #ddd9d3;
+  --el-color-info-light-9: #f4f2ed;
+  --el-color-info-dark-2: #565148;
+
+  --el-bg-color: var(--lux-surface);
+  --el-bg-color-page: var(--lux-porcelain-100);
+  --el-bg-color-overlay: var(--lux-surface);
+
+  --el-text-color-primary: var(--lux-text-strong);
+  --el-text-color-regular: var(--lux-text);
+  --el-text-color-secondary: var(--lux-text-muted);
+  --el-text-color-placeholder: var(--lux-text-faint);
+  --el-text-color-disabled: #b9b2a4;
+
+  --el-border-color: var(--lux-line);
+  --el-border-color-light: var(--lux-line-soft);
+  --el-border-color-lighter: #f2ede3;
+  --el-border-color-extra-light: #f7f3eb;
+  --el-border-color-dark: var(--lux-line-strong);
+  --el-border-color-darker: #bfb6a4;
+
+  --el-fill-color: #f2ede3;
+  --el-fill-color-light: #f7f3eb;
+  --el-fill-color-lighter: #faf7f1;
+  --el-fill-color-extra-light: #fcfaf5;
+  --el-fill-color-dark: #e9e3d7;
+  --el-fill-color-darker: #ded7c9;
+  --el-fill-color-blank: var(--lux-surface);
+
+  --el-border-radius-base: var(--lux-radius-xs);
+  --el-border-radius-small: var(--lux-radius-xs);
+  --el-border-radius-round: 999px;
+  --el-border-radius-circle: 50%;
+
+  --el-font-family: var(--lux-font-ui);
+  --el-font-size-base: 13px;
+  --el-font-size-small: 12px;
+  --el-font-size-large: 15px;
+
+  --el-box-shadow: var(--lux-shadow-pop);
+  --el-box-shadow-light: 0 12px 32px rgb(20 16 8 / 10%);
+  --el-box-shadow-lighter: 0 8px 20px rgb(20 16 8 / 8%);
+  --el-box-shadow-dark: var(--lux-shadow-dialog);
+
+  --el-mask-color: rgb(7 10 15 / 58%);
+  --el-mask-color-extra-light: rgb(7 10 15 / 26%);
+  --el-disabled-bg-color: #f4f1ea;
+  --el-disabled-text-color: #b9b2a4;
+  --el-disabled-border-color: #e6e0d4;
+}

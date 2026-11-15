@@ -1,0 +1,98 @@
+/** 自行车装配 MES — 移动作业端设计变量 */
+$app-primary: #2563eb;
+$app-primary-light: #eaf1ff;
+$app-primary-active: #1d4ed8;
+$app-primary-dark: #153e75;
+
+$app-success: #16a34a;
+$app-success-light: #eaf8ef;
+$app-warning: #f59e0b;
+$app-warning-light: #fff7e8;
+$app-danger: #ef4444;
+$app-danger-light: #fff0f0;
+$app-info: #0ea5e9;
+
+$app-bg-page: #f3f6fb;
+$app-bg-card: #ffffff;
+$app-bg-input: #f7f9fc;
+$app-bg-hover: #f1f5fa;
+$app-bg-dark: #0f2747;
+
+$app-text-primary: #172033;
+$app-text-secondary: #475569;
+$app-text-tertiary: #7b8aa0;
+$app-text-placeholder: #a7b1c2;
+
+$app-border-light: #dfe6ef;
+$app-border-card: #e5ebf3;
+$app-divider: #edf1f6;
+
+$app-radius-sm: 10rpx;
+$app-radius-base: 18rpx;
+$app-radius-card: 24rpx;
+$app-radius-lg: 28rpx;
+$app-radius-modal: 32rpx;
+$app-radius-round: 50%;
+
+$app-space-xs: 8rpx;
+$app-space-sm: 12rpx;
+$app-space-md: 16rpx;
+$app-space-base: 20rpx;
+$app-space-card: 24rpx;
+$app-space-page: 28rpx;
+$app-space-lg: 32rpx;
+
+$app-font-title: 38rpx;
+$app-font-subtitle: 31rpx;
+$app-font-card-title: 29rpx;
+$app-font-body: 28rpx;
+$app-font-desc: 24rpx;
+$app-font-tip: 22rpx;
+$app-font-btn: 28rpx;
+
+$app-weight-bold: 700;
+$app-weight-medium: 600;
+$app-weight-normal: 400;
+$app-line-height-base: 1.5;
+
+$app-shadow-card: 0 8rpx 28rpx rgba(30, 64, 175, 0.055);
+$app-shadow-light: 0 4rpx 16rpx rgba(15, 23, 42, 0.04);
+$app-shadow-modal: 0 -18rpx 48rpx rgba(15, 23, 42, 0.16);
+$app-shadow-primary: 0 10rpx 24rpx rgba(37, 99, 235, 0.22);
+
+$app-input-height: 92rpx;
+$app-btn-height: 92rpx;
+$app-btn-small-height: 66rpx;
+$app-list-row-height: 104rpx;
+
+$uni-color-primary: $app-primary;
+$uni-color-success: $app-success;
+$uni-color-warning: $app-warning;
+$uni-color-error: $app-danger;
+$uni-text-color: $app-text-primary;
+$uni-text-color-inverse: #fff;
+$uni-text-color-grey: $app-text-tertiary;
+$uni-text-color-placeholder: $app-text-placeholder;
+$uni-text-color-disable: #c0c7d2;
+$uni-bg-color: $app-bg-card;
+$uni-bg-color-grey: $app-bg-page;
+$uni-bg-color-hover: $app-bg-hover;
+$uni-bg-color-mask: rgba(15, 23, 42, 0.45);
+$uni-border-color: $app-border-light;
+$uni-font-size-sm: 12px;
+$uni-font-size-base: 14px;
+$uni-font-size-lg: 16px;
+$uni-img-size-sm: 20px;
+$uni-img-size-base: 26px;
+$uni-img-size-lg: 40px;
+$uni-border-radius-sm: 5px;
+$uni-border-radius-base: 9px;
+$uni-border-radius-lg: 14px;
+$uni-border-radius-circle: 50%;
+$uni-spacing-row-sm: 5px;
+$uni-spacing-row-base: 10px;
+$uni-spacing-row-lg: 15px;
+$uni-spacing-col-sm: 4px;
+$uni-spacing-col-base: 8px;
+$uni-spacing-col-lg: 12px;
+$uni-opacity-disabled: 0.35;

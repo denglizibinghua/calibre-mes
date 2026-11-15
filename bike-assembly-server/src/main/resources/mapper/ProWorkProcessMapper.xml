@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bikeassembly.mapper.ProWorkProcessMapper">
+
+    <select id="selectAppPageByCondition" resultType="com.bikeassembly.entity.ProWorkProcess">
+        SELECT pp.*, COALESCE(su.nickname, su.username, pp.operator) AS operator
+        FROM pro_work_process pp
+        INNER JOIN pro_work_order wo ON wo.work_order_id = pp.work_order_id
+        LEFT JOIN sys_user su ON su.user_id = pp.operator_user_id
+        <where>
+            <if test="assigneeUserId != null">AND wo.assignee_user_id = #{assigneeUserId}</if>
+            <if test="workOrderId != null">AND pp.work_order_id = #{workOrderId}</if>
+        </where>
+        ORDER BY pp.create_time DESC, pp.process_record_id DESC
+    </select>
+
+    <!--
+      工序记录分页查询（含操作员姓名）。
+      assigneeUserId 不为 null 时按工单指派执行人过滤。
+      operator 字段通过 LEFT JOIN sys_user 动态获取显示名：
+        COALESCE(su.nickname, su.username, pp.operator)
+      优先用用户昵称，其次用户名，都不存在时回退历史 operator 字段。
+    -->
+    <select id="selectPageByCondition" resultType="com.bikeassembly.entity.ProWorkProcess">
+        SELECT pp.*,
+               COALESCE(su.nickname, su.username, pp.operator) AS operator
+        FROM pro_work_process pp
+        LEFT JOIN sys_user su ON su.user_id = pp.operator_user_id
+        <if test="assigneeUserId != null">
+            INNER JOIN pro_work_order wo ON wo.work_order_id = pp.work_order_id
+        </if>
+        <where>
+            <if test="assigneeUserId != null">
+                AND wo.assignee_user_id = #{assigneeUserId}
+            </if>
+        </where>
+        ORDER BY pp.create_time DESC
+    </select>
+
+    <!-- 按 ID 查询工序记录（含操作员姓名） -->
+    <select id="selectByIdWithOperator" resultType="com.bikeassembly.entity.ProWorkProcess">
+        SELECT pp.*,
+               COALESCE(su.nickname, su.username, pp.operator) AS operator
+        FROM pro_work_process pp
+        LEFT JOIN sys_user su ON su.user_id = pp.operator_user_id
+        WHERE pp.process_record_id = #{processRecordId}
+    </select>
+
+    <!--
+      [答辩重点] 原子累加报工数量 —— 并发报工的核心保护 SQL。
+      被调用方：ProWorkProcessServiceImpl.optimisticUpdateWithReport
+      [并发控制] 单条 SQL 实现三个并发保护：
+        1. version = #{version}：乐观锁，防止并发覆盖
+        2. report_qty = report_qty + #{reportQty}：在数据库层面原子累加（不使用 Java 先读后写）
+        3. (report_qty + #{reportQty}) &lt;= plan_qty：防止报工数量超计划
+      如果 WHERE 条件不满足（版本冲突或超量），影响行数为 0，Java 层抛 StateMachineException
+      [数据库操作] 同时更新 pro_work_process 和 JOIN pro_work_order 做校验
+    -->
+    <update id="accumulateReportQty">
+        UPDATE pro_work_process pp
+        INNER JOIN pro_work_order wo ON wo.work_order_id = pp.work_order_id
+        SET pp.report_qty = pp.report_qty + #{reportQty},
+            pp.version    = pp.version + 1
+        WHERE pp.process_record_id = #{processRecordId}
+          AND pp.status = '1'
+          AND pp.version = #{version}
+          AND (pp.report_qty + #{reportQty}) &lt;= wo.plan_qty
+    </update>
+
+    <!-- [数据库操作] 获取工单下最大 step_seq，用于新工序的序号兜底计算 -->
+    <select id="selectMaxStepSeqByWorkOrderId" resultType="int">
+        SELECT COALESCE(MAX(step_seq), 0)
+        FROM pro_work_process
+        WHERE work_order_id = #{workOrderId}
+    </select>
+
+</mapper>

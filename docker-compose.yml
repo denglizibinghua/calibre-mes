@@ -1,0 +1,343 @@
+# ============================================================
+# 一键部署：MySQL + RabbitMQ + Redis + PGVector + BGE-M3 + 后端 + Web 管理端
+# 用法：
+#   docker compose --profile pgvector --profile local-embedding-cpu --profile local-chat --profile graphrag up -d --build
+#   Web 管理端 http://localhost:8081   后端 http://localhost:8080
+# 首次启动会自动执行 sql/init_database.sql 与 sql/dev_seed_full.sql
+# ============================================================
+services:
+  chat-model:
+    image: ${LOCAL_CHAT_IMAGE:-vllm/vllm-openai:v0.32.0}
+    profiles: ["local-chat"]
+    restart: unless-stopped
+    command:
+      - "--model"
+      - "${LOCAL_CHAT_MODEL_PATH:-/models/qwen3-4b-awq}"
+      - "--served-model-name"
+      - "${LOCAL_CHAT_MODEL:-Eslzzyl/Qwen3-4B-Instruct-2507-AWQ}"
+      - "--quantization"
+      - "awq"
+      - "--dtype"
+      - "half"
+      - "--max-model-len"
+      - "${LOCAL_CHAT_MAX_MODEL_LEN:-4096}"
+      - "--gpu-memory-utilization"
+      - "${LOCAL_CHAT_GPU_MEMORY_UTILIZATION:-0.42}"
+      - "--api-key"
+      - "${AI_OPENAI_API_KEY:-local-chat-key}"
+    environment:
+      HF_HOME: /root/.cache/huggingface
+    volumes:
+      - type: bind
+        source: ${LOCAL_CHAT_MODEL_PATH_HOST:-./models/qwen3-4b-awq}
+        target: /models/qwen3-4b-awq
+        read_only: true
+      - type: bind
+        source: ${LOCAL_CHAT_CACHE_PATH:-./.cache/huggingface}
+        target: /root/.cache/huggingface
+        bind:
+          create_host_path: true
+    ports:
+      - "127.0.0.1:${LOCAL_CHAT_PORT:-8002}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 15s
+      timeout: 5s
+      retries: 60
+      start_period: 180s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  embedding:
+    image: ${LOCAL_EMBEDDING_IMAGE:-vllm/vllm-openai:v0.32.0}
+    profiles: ["local-embedding"]
+    restart: unless-stopped
+    command:
+      - "--model"
+      - "${LOCAL_EMBEDDING_MODEL_PATH:-${LOCAL_EMBEDDING_MODEL:-BAAI/bge-m3}}"
+      - "--served-model-name"
+      - "${LOCAL_EMBEDDING_MODEL:-BAAI/bge-m3}"
+      - "--runner"
+      - "pooling"
+      - "--hf-overrides"
+      - '{"architectures": ["BgeM3EmbeddingModel"]}'
+      - "--pooler-config.task"
+      - "embed"
+      - "--api-key"
+      - "${LOCAL_EMBEDDING_API_KEY:-local-embedding-key}"
+      - "--max-model-len"
+      - "${LOCAL_EMBEDDING_MAX_MODEL_LEN:-8192}"
+      - "--gpu-memory-utilization"
+      - "${LOCAL_EMBEDDING_GPU_MEMORY_UTILIZATION:-0.55}"
+    environment:
+      HF_HOME: /root/.cache/huggingface
+    volumes:
+      - type: bind
+        source: ${LOCAL_EMBEDDING_MODEL_PATH_HOST:-./models/bge-m3}
+        target: /models/bge-m3
+        read_only: true
+      - type: bind
+        source: ${LOCAL_EMBEDDING_CACHE_PATH:-./.cache/huggingface}
+        target: /root/.cache/huggingface
+        bind:
+          create_host_path: true
+    ports:
+      - "127.0.0.1:${LOCAL_EMBEDDING_PORT:-8001}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 120s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  embedding-cpu:
+    build:
+      context: ./embedding-cpu
+    profiles: ["local-embedding-cpu"]
+    restart: unless-stopped
+    environment:
+      EMBEDDING_MODEL_PATH: /models/bge-m3
+      EMBEDDING_MODEL_NAME: ${AI_EMBEDDING_MODEL:-BAAI/bge-m3}
+      EMBEDDING_MAX_BATCH_SIZE: ${LOCAL_EMBEDDING_CPU_MAX_BATCH_SIZE:-4}
+      EMBEDDING_MAX_INPUT_CHARS: ${AI_CONTEXT_MAX_CHARS:-12000}
+      OMP_NUM_THREADS: ${LOCAL_EMBEDDING_CPU_THREADS:-4}
+      MKL_NUM_THREADS: ${LOCAL_EMBEDDING_CPU_THREADS:-4}
+    volumes:
+      - type: bind
+        source: ${LOCAL_EMBEDDING_MODEL_PATH_HOST:-./models/bge-m3}
+        target: /models/bge-m3
+        read_only: true
+    ports:
+      - "127.0.0.1:${LOCAL_EMBEDDING_CPU_PORT:-8003}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 15s
+      timeout: 5s
+      retries: 60
+      start_period: 120s
+
+  face:
+    build:
+      context: ./face-service
+    profiles: ["local-face"]
+    restart: unless-stopped
+    environment:
+      FACE_DETECTOR_MODEL: /models/face_detection_yunet_2023mar.onnx
+      FACE_RECOGNIZER_MODEL: /models/face_recognition_sface_2021dec.onnx
+      FACE_ANTISPOOF_MODEL: /models/minifasnet_v2.onnx
+      FACE_ANTISPOOF_ENABLED: ${FACE_ANTISPOOF_ENABLED:-true}
+      FACE_ANTISPOOF_REAL_CLASS_INDEX: ${FACE_ANTISPOOF_REAL_CLASS_INDEX:--1}
+      FACE_ANTISPOOF_INPUT_SIZE: ${FACE_ANTISPOOF_INPUT_SIZE:-80}
+      FACE_ANTISPOOF_THRESHOLD: ${FACE_ANTISPOOF_THRESHOLD:-0.80}
+      FACE_MAX_IMAGE_BYTES: ${FACE_MAX_IMAGE_BYTES:-4194304}
+    volumes:
+      - type: bind
+        source: ${FACE_MODELS_PATH_HOST:-./models/face}
+        target: /models
+        read_only: true
+    ports:
+      - "127.0.0.1:${FACE_SERVICE_PORT:-8092}:8092"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8092/health', timeout=2)"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+      start_period: 20s
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-123456}
+      MYSQL_DATABASE: bike_assembly_mes
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./sql/init_database.sql:/docker-entrypoint-initdb.d/01-init_database.sql:ro
+      - ./sql/dev_seed_full.sql:/docker-entrypoint-initdb.d/02-dev_seed_full.sql:ro
+      - ./sql/patch_ai_reliability_v1.sql:/docker-entrypoint-initdb.d/03-patch_ai_reliability_v1.sql:ro
+      - ./sql/patch_ai_permissions_v1.sql:/docker-entrypoint-initdb.d/04-patch_ai_permissions_v1.sql:ro
+      - ./sql/patch_ai_phase2.sql:/docker-entrypoint-initdb.d/05-patch_ai_phase2.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${MYSQL_PASSWORD:-123456}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: unless-stopped
+    environment:
+      # guest 默认仅允许本机连接，这里创建专用账号供后端跨容器访问
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-mes}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-mes123456}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  pgvector:
+    image: pgvector/pgvector:pg16
+    profiles: ["pgvector"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PGVECTOR_DATABASE:-mes_ai}
+      POSTGRES_USER: ${PGVECTOR_USERNAME:-mes}
+      POSTGRES_PASSWORD: ${PGVECTOR_PASSWORD:-mes123456}
+    volumes:
+      - pgvector-data:/var/lib/postgresql/data
+    ports:
+      - "${PGVECTOR_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGVECTOR_USERNAME:-mes} -d ${PGVECTOR_DATABASE:-mes_ai}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  neo4j:
+    image: neo4j:5-community
+    profiles: ["graphrag"]
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${AI_NEO4J_USERNAME:-neo4j}/${AI_NEO4J_PASSWORD:-local-change-this-neo4j-password}
+      NEO4J_server_memory_heap_initial__size: ${AI_NEO4J_HEAP_INITIAL:-256m}
+      NEO4J_server_memory_heap_max__size: ${AI_NEO4J_HEAP_MAX:-512m}
+      NEO4J_server_memory_pagecache_size: ${AI_NEO4J_PAGECACHE:-512m}
+    volumes:
+      - neo4j-data:/data
+    ports:
+      - "127.0.0.1:${AI_NEO4J_PORT:-7474}:7474"
+      - "127.0.0.1:${AI_NEO4J_BOLT_PORT:-7687}:7687"
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u \"$${NEO4J_AUTH%%/*}\" -p \"$${NEO4J_AUTH#*/}\" 'RETURN 1' >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 8s
+      retries: 20
+      start_period: 45s
+
+  backend:
+    build: .
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/bike_assembly_mes?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false&allowMultiQueries=true
+      SPRING_CHARSET: UTF-8
+      JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USERNAME:-root}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-123456}
+      SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: ${AI_KNOWLEDGE_MAX_FILE_SIZE:-50MB}
+      SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: ${AI_KNOWLEDGE_MAX_REQUEST_SIZE:-51MB}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-mes}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-mes123456}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
+      APP_RABBITMQ_ENABLED: ${APP_RABBITMQ_ENABLED:-true}
+      JWT_ADMIN_SECRET: ${JWT_ADMIN_SECRET:-replace-with-random-secret-0123456789abcdef}
+      JWT_APP_SECRET: ${JWT_APP_SECRET:-replace-with-random-secret-0123456789fedcba}
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_APP_SECRET: ${WECHAT_APP_SECRET:-}
+      # Compose reads .env, not application-dev.yml. Keep model credentials
+      # in the local .env or inject them into the Docker environment.
+      AI_OPENAI_BASE_URL: ${AI_OPENAI_BASE_URL:-http://chat-model:8000/v1}
+      AI_OPENAI_API_KEY: ${AI_OPENAI_API_KEY:-local-disabled-key}
+      AI_CHAT_MODEL: ${AI_CHAT_MODEL:-Eslzzyl/Qwen3-4B-Instruct-2507-AWQ}
+      AI_EMBEDDING_BASE_URL: ${AI_EMBEDDING_BASE_URL:-http://embedding-cpu:8000/v1}
+      AI_EMBEDDING_API_KEY: ${AI_EMBEDDING_API_KEY:-local-embedding-key}
+      AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-BAAI/bge-m3}
+      AI_TEMPERATURE: ${AI_TEMPERATURE:-0.3}
+      AI_MAX_TOKENS: ${AI_MAX_TOKENS:-2048}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-120}
+      AI_REASONING_EFFORT: ${AI_REASONING_EFFORT:-medium}
+      AI_CONTEXT_MAX_CHARS: ${AI_CONTEXT_MAX_CHARS:-12000}
+      AI_RAG_MIN_SIMILARITY: ${AI_RAG_MIN_SIMILARITY:-0.70}
+      AI_KNOWLEDGE_PATH: ${AI_KNOWLEDGE_PATH:-docs}
+      AI_PUBLIC_KNOWLEDGE_UPLOAD_PATH: ${AI_PUBLIC_KNOWLEDGE_UPLOAD_PATH:-/app/data/ai/public-uploads}
+      AI_PRIVATE_KNOWLEDGE_PATH: ${AI_PRIVATE_KNOWLEDGE_PATH:-/app/data/ai/private}
+      AI_NEO4J_ENABLED: ${AI_NEO4J_ENABLED:-false}
+      AI_NEO4J_URI: ${AI_NEO4J_URI:-bolt://neo4j:7687}
+      AI_NEO4J_USERNAME: ${AI_NEO4J_USERNAME:-neo4j}
+      AI_NEO4J_PASSWORD: ${AI_NEO4J_PASSWORD:-}
+      FACE_SERVICE_URL: ${FACE_SERVICE_URL:-http://face:8092}
+      FACE_TEMPLATE_ENCRYPTION_KEY: ${FACE_TEMPLATE_ENCRYPTION_KEY:-}
+      FACE_MATCH_THRESHOLD: ${FACE_MATCH_THRESHOLD:-0.42}
+      FACE_AMBIGUITY_MARGIN: ${FACE_AMBIGUITY_MARGIN:-0.06}
+      AI_PGVECTOR_ENABLED: ${AI_PGVECTOR_ENABLED:-false}
+      AI_PGVECTOR_DIMENSIONS: ${AI_PGVECTOR_DIMENSIONS:-1024}
+      AI_PGVECTOR_TABLE: ${AI_PGVECTOR_TABLE:-vector_store_bge_m3_1024}
+      AI_PGVECTOR_URL: ${AI_PGVECTOR_URL:-jdbc:postgresql://pgvector:5432/${PGVECTOR_DATABASE:-mes_ai}}
+      AI_PGVECTOR_USERNAME: ${AI_PGVECTOR_USERNAME:-mes}
+      AI_PGVECTOR_PASSWORD: ${AI_PGVECTOR_PASSWORD:-mes123456}
+      AI_PGVECTOR_INITIALIZE_SCHEMA: ${AI_PGVECTOR_INITIALIZE_SCHEMA:-true}
+      AI_PGVECTOR_SCHEMA_VALIDATION: ${AI_PGVECTOR_SCHEMA_VALIDATION:-false}
+      # Keep browser and WebSocket origins aligned with the published web port.
+      BIKE_CORS_ALLOWED_ORIGINS: ${BIKE_CORS_ALLOWED_ORIGINS:-http://localhost:8081},http://localhost:${WEB_PORT:-8081},http://127.0.0.1:${WEB_PORT:-8081}
+    volumes:
+      - ./docs:/app/docs:ro
+      - public-ai-files:/app/data/ai/public-uploads
+      - private-ai-files:/app/data/ai/private
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/admin/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  web:
+    build:
+      context: ./bike-assembly-mes-web
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8081}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  mysql-data:
+  pgvector-data:
+  embedding-cache:
+  neo4j-data:
+  public-ai-files:
+  private-ai-files:

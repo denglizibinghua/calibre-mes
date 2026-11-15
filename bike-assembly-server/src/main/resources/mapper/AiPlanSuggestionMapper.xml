@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bikeassembly.mapper.AiPlanSuggestionMapper">
+    <select id="selectByUuidAndOperator" resultType="com.bikeassembly.entity.AiPlanSuggestion">
+        SELECT * FROM ai_plan_suggestion
+        WHERE plan_uuid = #{planUuid} AND operator_id = #{operatorId}
+        LIMIT 1
+    </select>
+</mapper>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bikeassembly.mapper.WmsInventoryMapper">
+
+    <!-- 基础 CRUD 已由 MyBatis-Plus BaseMapper 提供，此处只写自定义查询 -->
+
+    <select id="selectListByCondition" resultType="com.bikeassembly.entity.WmsInventory">
+        SELECT wi.*
+        FROM wms_inventory wi
+        LEFT JOIN base_item bi ON bi.item_id = wi.item_id
+        LEFT JOIN wms_location wl ON wl.location_id = wi.location_id
+        <where>
+            <if test="itemCode != null and itemCode != ''">
+                AND bi.item_code LIKE concat('%', #{itemCode}, '%')
+            </if>
+            <if test="itemName != null and itemName != ''">
+                AND bi.item_name LIKE concat('%', #{itemName}, '%')
+            </if>
+            <if test="warehouseName != null and warehouseName != ''">
+                AND wl.location_name LIKE concat('%', #{warehouseName}, '%')
+            </if>
+        </where>
+        ORDER BY wi.update_time DESC
+    </select>
+
+    <!--
+        V2.2 分页查询：与 selectListByCondition 查询逻辑相同，
+        但第一个参数是 MyBatis-Plus Page，分页插件自动注入 COUNT + LIMIT。
+    -->
+    <select id="selectPageByCondition" resultType="com.bikeassembly.entity.WmsInventory">
+        SELECT wi.*, bi.item_code, bi.item_name, bi.unit, wl.location_code, wl.location_name
+        FROM wms_inventory wi
+        LEFT JOIN base_item bi ON bi.item_id = wi.item_id
+        LEFT JOIN wms_location wl ON wl.location_id = wi.location_id
+        <where>
+            <if test="itemCode != null and itemCode != ''">
+                AND bi.item_code LIKE concat('%', #{itemCode}, '%')
+            </if>
+            <if test="itemName != null and itemName != ''">
+                AND bi.item_name LIKE concat('%', #{itemName}, '%')
+            </if>
+            <if test="warehouseName != null and warehouseName != ''">
+                AND wl.location_name LIKE concat('%', #{warehouseName}, '%')
+            </if>
+        </where>
+        ORDER BY wi.update_time DESC
+    </select>
+
+    <!-- 跨表检查库存被外键引用的次数，当前暂无直接 FK 引用 -->
+    <select id="countReferences" resultType="int">
+        SELECT COUNT(*) FROM (
+            SELECT 1 FROM (SELECT 1) t WHERE 1 = 0
+        ) t
+    </select>
+
+    <update id="addStock">
+        UPDATE wms_inventory
+        SET qty = qty + #{qty}, update_time = NOW()
+        WHERE inventory_id = #{inventoryId}
+    </update>
+
+    <update id="deductStock">
+        UPDATE wms_inventory
+        SET qty = qty - #{qty}, update_time = NOW()
+        WHERE inventory_id = #{inventoryId} AND qty >= #{qty}
+    </update>
+
+</mapper>

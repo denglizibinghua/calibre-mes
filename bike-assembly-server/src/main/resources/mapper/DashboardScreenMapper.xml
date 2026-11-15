@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bikeassembly.mapper.DashboardScreenMapper">
+    <!-- All inputs are bound. Unit selection includes descendants (MySQL 8). -->
+    <sql id="units">
+        <if test="unitId != null">
+            WITH RECURSIVE screen_units AS (
+                SELECT unit_id FROM base_work_unit WHERE unit_id = #{unitId} AND status = '0'
+                UNION ALL
+                SELECT u.unit_id FROM base_work_unit u JOIN screen_units s ON u.parent_id = s.unit_id
+                WHERE u.status = '0'
+            )
+        </if>
+    </sql>
+    <sql id="ordersScope">
+        <if test="unitId != null">AND wo.work_unit_id IN (SELECT unit_id FROM screen_units)</if>
+        <if test="userId != null">AND wo.assignee_user_id = #{userId}</if>
+    </sql>
+    <sql id="alertsScope">
+        <if test="unitId != null">AND COALESCE(a.unit_id, wo.work_unit_id) IN (SELECT unit_id FROM screen_units)</if>
+        <if test="userId != null">
+            AND (a.reporter_user_id = #{userId} OR a.handler_user_id = #{userId} OR wo.assignee_user_id = #{userId})
+        </if>
+    </sql>
+
+    <select id="summary" resultType="com.bikeassembly.vo.DashboardScreenVO$Summary">
+        <include refid="units"/>
+        SELECT
+          (SELECT COUNT(*) FROM pro_work_order wo WHERE wo.status IN ('1','4','5') <include refid="ordersScope"/>) AS active_work_orders,
+          (SELECT COUNT(*) FROM pro_work_order wo WHERE wo.status IN ('2','3')
+             AND wo.actual_end_time &gt;= #{today} AND wo.actual_end_time &lt;= #{now} <include refid="ordersScope"/>) AS today_completed_work_orders,
+          (SELECT COUNT(*) FROM pro_work_order wo WHERE wo.status IN ('1','4','5')
+             AND wo.plan_end_time &lt; #{now} <include refid="ordersScope"/>) AS overdue_work_orders,
+          (SELECT COUNT(*) FROM qms_inspection qi JOIN pro_work_order wo ON wo.work_order_id = qi.work_order_id
+             WHERE qi.status IN ('0','1') <include refid="ordersScope"/>) AS pending_inspections,
+          (SELECT COUNT(*) FROM andon_alert a LEFT JOIN pro_work_order wo ON wo.work_order_id = a.work_order_id
+             WHERE a.status IN ('0','1') AND a.create_time &lt;= #{now} <include refid="alertsScope"/>) AS open_alerts
+    </select>
+
+    <select id="equipment" resultType="com.bikeassembly.vo.DashboardScreenVO$Equipment">
+        <include refid="units"/>
+        SELECT COALESCE(SUM(e.status = '0' AND e.running_status = '0'), 0) AS available,
+               COALESCE(SUM(e.status = '0' AND e.running_status = '1'), 0) AS fault,
+               COALESCE(SUM(e.status != '0'), 0) AS disabled
+        FROM base_equipment e WHERE 1 = 1
+        <if test="unitId != null">AND e.unit_id IN (SELECT unit_id FROM screen_units)</if>
+        <if test="userId != null">
+            AND EXISTS (SELECT 1 FROM pro_work_process pp JOIN pro_work_order wo ON wo.work_order_id = pp.work_order_id
+                        WHERE pp.equipment_id = e.equipment_id AND wo.assignee_user_id = #{userId})
+        </if>
+    </select>
+
+    <select id="quality" resultType="com.bikeassembly.vo.DashboardScreenVO$Quality">
+        <include refid="units"/>
+        SELECT COUNT(*) AS inspected, COALESCE(SUM(qi.result = 'P'), 0) AS passed
+        FROM qms_inspection qi JOIN pro_work_order wo ON wo.work_order_id = qi.work_order_id
+        WHERE qi.status = '2' AND qi.inspection_round = 1 AND qi.result IN ('P','F')
+          AND qi.inspection_time &gt;= #{start} AND qi.inspection_time &lt;= #{now}
+          <include refid="ordersScope"/>
+    </select>
+
+    <select id="plannedTrend" resultType="com.bikeassembly.vo.DashboardScreenVO$Trend">
+        <include refid="units"/>
+        SELECT DATE(wo.plan_end_time) AS date, COUNT(*) AS planned FROM pro_work_order wo
+        WHERE wo.status NOT IN ('0','6') AND wo.plan_end_time &gt;= #{start} AND wo.plan_end_time &lt; #{end}
+          <include refid="ordersScope"/>
+        GROUP BY DATE(wo.plan_end_time) ORDER BY date
+    </select>
+
+    <select id="completedTrend" resultType="com.bikeassembly.vo.DashboardScreenVO$Trend">
+        <include refid="units"/>
+        SELECT DATE(wo.actual_end_time) AS date, COUNT(*) AS completed FROM pro_work_order wo
+        WHERE wo.status IN ('2','3') AND wo.actual_end_time &gt;= #{start} AND wo.actual_end_time &lt;= #{now}
+          <include refid="ordersScope"/>
+        GROUP BY DATE(wo.actual_end_time) ORDER BY date
+    </select>
+
+    <select id="qualityTrend" resultType="com.bikeassembly.vo.DashboardScreenVO$Trend">
+        <include refid="units"/>
+        SELECT DATE(qi.inspection_time) AS date, COUNT(*) AS inspected, SUM(qi.result = 'P') AS passed
+        FROM qms_inspection qi JOIN pro_work_order wo ON wo.work_order_id = qi.work_order_id
+        WHERE qi.status = '2' AND qi.inspection_round = 1 AND qi.result IN ('P','F')
+          AND qi.inspection_time &gt;= #{start} AND qi.inspection_time &lt;= #{now}
+          <include refid="ordersScope"/>
+        GROUP BY DATE(qi.inspection_time) ORDER BY date
+    </select>
+
+    <select id="processes" resultType="com.bikeassembly.vo.DashboardScreenVO$ProcessLoad">
+        <include refid="units"/>
+        SELECT pp.process_id, bp.process_name, COUNT(*) AS total,
+               SUM(pp.status = '1') AS running, SUM(pp.status = '3') AS waiting,
+               SUM(pp.status IN ('5','6')) AS abnormal, SUM(pp.status IN ('2','7')) AS completed,
+               SUM(pp.status IN ('0','9','4')) AS queued
+        FROM pro_work_process pp JOIN pro_work_order wo ON wo.work_order_id = pp.work_order_id
+        JOIN base_process bp ON bp.process_id = pp.process_id
+        WHERE wo.status IN ('1','4','5') AND pp.status != '8' <include refid="ordersScope"/>
+        GROUP BY pp.process_id, bp.process_name ORDER BY MIN(pp.step_seq), pp.process_id
+    </select>
+
+    <select id="workOrders" resultType="com.bikeassembly.vo.DashboardScreenVO$WorkOrder">
+        <include refid="units"/>
+        SELECT wo.work_order_id, wo.work_order_no, bi.item_name, u.unit_name,
+               wo.plan_qty, wo.unit, wo.status, wo.plan_end_time,
+               COALESCE(p.total_steps, 0) AS total_steps, COALESCE(p.completed_steps, 0) AS completed_steps,
+               (wo.status IN ('1','4','5') AND wo.plan_end_time &lt; #{now}) AS overdue
+        FROM pro_work_order wo LEFT JOIN base_item bi ON bi.item_id = wo.item_id
+        LEFT JOIN base_work_unit u ON u.unit_id = wo.work_unit_id
+        LEFT JOIN (SELECT work_order_id, COUNT(*) AS total_steps, SUM(status IN ('2','7')) AS completed_steps
+                   FROM pro_work_process WHERE status != '8' GROUP BY work_order_id) p ON p.work_order_id = wo.work_order_id
+        WHERE wo.status NOT IN ('0','6')
+          AND (wo.status IN ('1','4','5') OR (wo.actual_end_time &gt;= #{start} AND wo.actual_end_time &lt;= #{now}))
+          <include refid="ordersScope"/>
+        ORDER BY (wo.status IN ('1','4','5') AND wo.plan_end_time &lt; #{now}) DESC,
+                 (wo.status = '5') DESC, (wo.status IN ('1','4')) DESC,
+                 wo.plan_end_time IS NULL, wo.plan_end_time, wo.work_order_id DESC LIMIT 12
+    </select>
+
+    <select id="alerts" resultType="com.bikeassembly.vo.DashboardScreenVO$Alert">
+        <include refid="units"/>
+        SELECT a.alert_id, a.alert_no, a.alert_type, a.alert_level, a.status, a.create_time,
+               u.unit_name, e.equipment_name
+        FROM andon_alert a LEFT JOIN pro_work_order wo ON wo.work_order_id = a.work_order_id
+        LEFT JOIN base_work_unit u ON u.unit_id = COALESCE(a.unit_id, wo.work_unit_id)
+        LEFT JOIN base_equipment e ON e.equipment_id = a.equipment_id
+        WHERE a.status IN ('0','1') AND a.create_time &lt;= #{now} <include refid="alertsScope"/>
+        ORDER BY a.alert_level DESC, a.create_time, a.alert_id LIMIT 8
+    </select>
+
+    <select id="defects" resultType="com.bikeassembly.vo.DashboardScreenVO$Defect">
+        <include refid="units"/>
+        SELECT COALESCE(NULLIF(d.defect_type, ''), '未分类') AS name, COUNT(*) AS value
+        FROM qms_defect d JOIN pro_work_order wo ON wo.work_order_id = d.work_order_id
+        WHERE d.create_time &gt;= #{start} AND d.create_time &lt;= #{now} <include refid="ordersScope"/>
+        GROUP BY COALESCE(NULLIF(d.defect_type, ''), '未分类') ORDER BY value DESC, name LIMIT 5
+    </select>
+
+    <select id="workUnits" resultType="com.bikeassembly.vo.DashboardScreenVO$WorkUnit">
+        SELECT u.unit_id, u.unit_name, u.unit_type FROM base_work_unit u
+        WHERE u.status = '0' AND u.unit_type IN ('W','L','S')
+        <if test="userId != null">
+            AND EXISTS (SELECT 1 FROM pro_work_order wo WHERE wo.work_unit_id = u.unit_id AND wo.assignee_user_id = #{userId})
+        </if>
+        ORDER BY FIELD(u.unit_type, 'W','L','S'), u.unit_id
+    </select>
+</mapper>

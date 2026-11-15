@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bikeassembly.mapper.ProWorkOrderMapper">
+
+    <select id="selectByWorkOrderNo" resultType="com.bikeassembly.entity.ProWorkOrder">
+        SELECT * FROM pro_work_order WHERE work_order_no = #{workOrderNo}
+    </select>
+
+    <!-- 基础 CRUD 已由 MyBatis-Plus BaseMapper 提供，此处只写自定义查询 -->
+
+    <!--
+      [数据库操作] 统计工单被其他业务表引用的数量。
+      被调用方：ProWorkOrderServiceImpl.deleteProWorkOrder（删除前检查引用）
+      检查四张关联表：pro_work_process（工序）、qms_inspection（质检）、qms_defect（缺陷）、andon_alert（安灯）
+      引用数 > 0 时禁止删除工单
+    -->
+    <select id="countReferences" resultType="int">
+        SELECT COUNT(*) FROM (
+            SELECT 1 FROM pro_work_process WHERE work_order_id = #{workOrderId}
+            UNION ALL
+            SELECT 1 FROM qms_inspection WHERE work_order_id = #{workOrderId}
+            UNION ALL
+            SELECT 1 FROM qms_defect WHERE work_order_id = #{workOrderId}
+            UNION ALL
+            SELECT 1 FROM andon_alert WHERE work_order_id = #{workOrderId}
+        ) t
+    </select>
+
+    <select id="selectListByCondition" resultType="com.bikeassembly.entity.ProWorkOrder">
+        SELECT wo.*
+        FROM pro_work_order wo
+        LEFT JOIN base_item bi ON bi.item_id = wo.item_id
+        <where>
+            <if test="orderNo != null and orderNo != ''">
+                AND wo.order_no LIKE concat('%', #{orderNo}, '%')
+            </if>
+            <if test="productName != null and productName != ''">
+                AND bi.item_name LIKE concat('%', #{productName}, '%')
+            </if>
+        </where>
+        ORDER BY wo.create_time DESC
+    </select>
+
+    <!--
+      [数据库操作] 工单分页查询（带动态条件）。
+      被调用方：ProWorkOrderServiceImpl.listProWorkOrders
+      查询表：pro_work_order LEFT JOIN base_item（关联产品名称过滤）
+      动态条件：
+        - orderNo：按订单号模糊匹配
+        - productName：按产品名称模糊匹配（通过 JOIN base_item 表实现）
+        - assigneeUserId：按指派执行人精确匹配（小程序"我的工单"功能使用）
+      MyBatis-Plus IPage 自动追加 LIMIT/OFFSET 实现分页
+    -->
+    <select id="selectPageByCondition" resultType="com.bikeassembly.entity.ProWorkOrder">
+        SELECT wo.*
+        FROM pro_work_order wo
+        LEFT JOIN base_item bi ON bi.item_id = wo.item_id
+        <where>
+            <if test="workOrderNo != null and workOrderNo != ''">
+                AND wo.work_order_no LIKE concat('%', #{workOrderNo}, '%')
+            </if>
+            <if test="orderNo != null and orderNo != ''">
+                AND wo.order_no LIKE concat('%', #{orderNo}, '%')
+            </if>
+            <if test="productName != null and productName != ''">
+                AND bi.item_name LIKE concat('%', #{productName}, '%')
+            </if>
+            <if test="assigneeUserId != null">
+                AND wo.assignee_user_id = #{assigneeUserId}
+            </if>
+        </where>
+        ORDER BY wo.create_time DESC
+    </select>
+
+</mapper>

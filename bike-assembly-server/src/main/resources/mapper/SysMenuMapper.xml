@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bikeassembly.mapper.SysMenuMapper">
+
+    <!-- 查询某用户角色分配的所有菜单（不去重，交给 Service 层） -->
+    <select id="selectMenusByUserId" resultType="com.bikeassembly.entity.SysMenu">
+        SELECT DISTINCT m.menu_id, m.parent_id, m.menu_name, m.path, m.component,
+               m.icon, m.visible, m.keep_alive, m.redirect,
+               m.perms, m.menu_type, m.order_num, m.status
+        FROM sys_menu m
+        INNER JOIN sys_role_menu rm ON m.menu_id = rm.menu_id
+        INNER JOIN sys_user u ON u.role_id = rm.role_id
+        WHERE u.user_id = #{userId}
+          AND m.status = '0'
+        ORDER BY m.order_num ASC, m.menu_id ASC
+    </select>
+
+    <!-- 查询某用户角色分配的可见菜单（只返回目录和菜单页，用于菜单树） -->
+    <select id="selectVisibleMenusByUserId" resultType="com.bikeassembly.entity.SysMenu">
+        SELECT DISTINCT m.menu_id, m.parent_id, m.menu_name, m.path, m.component,
+               m.icon, m.visible, m.keep_alive, m.redirect,
+               m.perms, m.menu_type, m.order_num, m.status
+        FROM sys_menu m
+        INNER JOIN sys_role_menu rm ON m.menu_id = rm.menu_id
+        INNER JOIN sys_user u ON u.role_id = rm.role_id
+        WHERE u.user_id = #{userId}
+          AND m.menu_type IN ('D', 'C')
+          AND m.status = '0'
+        ORDER BY m.order_num ASC, m.menu_id ASC
+    </select>
+
+    <!-- 返回给定 ID 列表中真实存在的菜单 ID，用于角色授权入库前过滤非法/虚拟节点 -->
+    <select id="selectExistingMenuIds" resultType="java.lang.Long">
+        SELECT menu_id
+        FROM sys_menu
+        WHERE menu_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+</mapper>

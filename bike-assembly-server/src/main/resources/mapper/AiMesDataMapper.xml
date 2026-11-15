@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bikeassembly.mapper.AiMesDataMapper">
+
+    <sql id="orderScope">
+        <if test="userId != null">
+            AND wo.assignee_user_id = #{userId}
+        </if>
+        <if test="unitIds != null and unitIds.size() > 0">
+            AND wo.work_unit_id IN
+            <foreach collection="unitIds" item="unitId" open="(" separator="," close=")">
+                #{unitId}
+            </foreach>
+        </if>
+    </sql>
+
+    <select id="qualityByProcess" resultType="map">
+        SELECT
+            qi.process_id AS processId,
+            COALESCE(NULLIF(bp.process_name, ''), CONCAT('工序#', qi.process_id), '未关联工序') AS processName,
+            COUNT(*) AS inspectionCount,
+            SUM(CASE WHEN qi.result = 'F' THEN 1 ELSE 0 END) AS failedCount,
+            COALESCE(SUM(CASE WHEN qi.result = 'F' THEN
+                (SELECT COALESCE(SUM(d.qty), 0) FROM qms_defect d
+                 WHERE d.inspection_id = qi.inspection_id)
+                ELSE 0 END), 0) AS defectQty
+        FROM qms_inspection qi
+        LEFT JOIN pro_work_order wo ON wo.work_order_id = qi.work_order_id
+        LEFT JOIN base_process bp ON bp.process_id = qi.process_id
+        WHERE qi.status = '2'
+          AND qi.inspection_round = 1
+          AND qi.inspection_time &gt;= #{start}
+          AND qi.inspection_time &lt;= #{end}
+          <include refid="orderScope"/>
+        GROUP BY qi.process_id, bp.process_name
+        ORDER BY failedCount DESC, defectQty DESC, processName
+        LIMIT 20
+    </select>
+
+    <select id="inventorySummary" resultType="map">
+        SELECT
+            wi.item_id AS itemId,
+            bi.item_code AS itemCode,
+            bi.item_name AS itemName,
+            COALESCE(SUM(wi.qty), 0) AS quantity,
+            COALESCE(SUM(wi.locked_qty), 0) AS lockedQuantity,
+            bi.unit AS unit
+        FROM wms_inventory wi
+        LEFT JOIN base_item bi ON bi.item_id = wi.item_id
+        <where>
+            <if test="userId != null or (unitIds != null and unitIds.size() > 0)">AND 1 = 0</if>
+        </where>
+        GROUP BY wi.item_id, bi.item_code, bi.item_name, bi.unit
+        ORDER BY quantity ASC, itemName
+        LIMIT 50
+    </select>
+
+    <select id="repairSummary" resultType="map">
+        SELECT
+            er.repair_id AS repairId,
+            be.equipment_name AS equipmentName,
+            er.fault_desc AS faultDesc,
+            er.status AS status,
+            er.report_time AS reportTime,
+            er.finish_time AS finishTime
+        FROM eqm_repair_order er
+        LEFT JOIN base_equipment be ON be.equipment_id = er.equipment_id
+        WHERE er.report_time &gt;= #{start}
+          AND er.report_time &lt;= #{end}
+          <if test="unitIds != null and unitIds.size() > 0">
+            AND be.unit_id IN
+            <foreach collection="unitIds" item="unitId" open="(" separator="," close=")">
+                #{unitId}
+            </foreach>
+          </if>
+          <if test="userId != null">
+            AND (er.reporter_user_id = #{userId} OR er.handler_user_id = #{userId})
+          </if>
+        ORDER BY er.report_time DESC
+        LIMIT 50
+    </select>
+
+    <select id="andonSummary" resultType="map">
+        SELECT
+            aa.alert_id AS alertId,
+            aa.alert_no AS alertNo,
+            aa.alert_type AS alertType,
+            aa.alert_level AS alertLevel,
+            aa.status AS status,
+            aa.create_time AS createTime,
+            bwu.unit_name AS unitName,
+            be.equipment_name AS equipmentName
+        FROM andon_alert aa
+        LEFT JOIN base_work_unit bwu ON bwu.unit_id = aa.unit_id
+        LEFT JOIN base_equipment be ON be.equipment_id = aa.equipment_id
+        LEFT JOIN pro_work_order wo ON wo.work_order_id = aa.work_order_id
+        WHERE aa.create_time &gt;= #{start}
+          AND aa.create_time &lt;= #{end}
+          <if test="unitIds != null and unitIds.size() > 0">
+            AND (aa.unit_id IN
+            <foreach collection="unitIds" item="unitId" open="(" separator="," close=")">
+                #{unitId}
+            </foreach>
+            OR wo.work_unit_id IN
+            <foreach collection="unitIds" item="unitId" open="(" separator="," close=")">
+                #{unitId}
+            </foreach>)
+          </if>
+          <if test="userId != null">
+            AND (aa.reporter_user_id = #{userId}
+                 OR aa.handler_user_id = #{userId}
+                 OR wo.assignee_user_id = #{userId})
+          </if>
+        ORDER BY aa.status, aa.alert_level DESC, aa.create_time DESC
+        LIMIT 50
+    </select>
+</mapper>

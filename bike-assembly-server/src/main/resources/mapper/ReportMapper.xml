@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bikeassembly.mapper.ReportMapper">
+
+    <!-- ==================== 生产工单报表 ==================== -->
+    <sql id="workOrderReportSelect">
+        SELECT
+            wo.work_order_id AS workOrderId,
+            wo.work_order_no AS workOrderNo,
+            wo.order_no      AS orderNo,
+            wo.item_id       AS itemId,
+            bi.item_code     AS itemCode,
+            bi.item_name     AS itemName,
+            wo.plan_qty      AS planQty,
+            wo.unit          AS unit,
+            wo.status        AS status,
+            wo.plan_start_time AS planStartTime,
+            wo.plan_end_time   AS planEndTime,
+            wo.create_time   AS createTime
+        FROM pro_work_order wo
+        LEFT JOIN base_item bi ON bi.item_id = wo.item_id
+    </sql>
+
+    <sql id="workOrderReportWhere">
+        <where>
+            <if test="dto.startTime != null and dto.startTime != ''">
+                AND wo.create_time &gt;= #{dto.startTime}
+            </if>
+            <if test="dto.endTime != null and dto.endTime != ''">
+                AND wo.create_time &lt;= #{dto.endTime}
+            </if>
+            <if test="dto.status != null and dto.status != ''">
+                AND wo.status = #{dto.status}
+            </if>
+            <if test="dto.itemId != null">
+                AND wo.item_id = #{dto.itemId}
+            </if>
+            <!-- 数据权限：SELF 只看指派给当前用户的工单 -->
+            <if test="userId != null">
+                AND wo.assignee_user_id = #{userId}
+            </if>
+        </where>
+    </sql>
+
+    <select id="queryWorkOrderReport" resultType="com.bikeassembly.vo.report.WorkOrderReportVO">
+        <include refid="workOrderReportSelect"/>
+        <include refid="workOrderReportWhere"/>
+        ORDER BY wo.create_time DESC
+    </select>
+
+    <select id="listWorkOrderReport" resultType="com.bikeassembly.vo.report.WorkOrderReportVO">
+        <include refid="workOrderReportSelect"/>
+        <include refid="workOrderReportWhere"/>
+        ORDER BY wo.create_time DESC
+    </select>
+
+    <!-- ==================== 库存报表 ==================== -->
+    <sql id="inventoryReportSelect">
+        SELECT
+            wi.inventory_id  AS inventoryId,
+            wi.item_id       AS itemId,
+            bi.item_code     AS itemCode,
+            bi.item_name     AS itemName,
+            wi.location_id   AS locationId,
+            wl.location_code AS locationCode,
+            wl.location_name AS locationName,
+            wi.qty           AS quantity,
+            wi.locked_qty    AS lockedQuantity,
+            bi.unit          AS unit,
+            wi.batch_no      AS batchNo,
+            wi.update_time   AS updateTime
+        FROM wms_inventory wi
+        LEFT JOIN base_item bi ON bi.item_id = wi.item_id
+        LEFT JOIN wms_location wl ON wl.location_id = wi.location_id
+    </sql>
+
+    <sql id="inventoryReportWhere">
+        <where>
+            <if test="dto.itemId != null">
+                AND wi.item_id = #{dto.itemId}
+            </if>
+            <if test="dto.locationId != null">
+                AND wi.location_id = #{dto.locationId}
+            </if>
+            <if test="dto.itemType != null and dto.itemType != ''">
+                AND bi.item_type = #{dto.itemType}
+            </if>
+            <!-- 库存表无归属字段，非 ALL 数据范围已在 Service 层拦截；
+                 此处 userId 非空时强制空结果，作为防越权双保险 -->
+            <if test="userId != null">
+                AND 1 = 0
+            </if>
+        </where>
+    </sql>
+
+    <select id="queryInventoryReport" resultType="com.bikeassembly.vo.report.InventoryReportVO">
+        <include refid="inventoryReportSelect"/>
+        <include refid="inventoryReportWhere"/>
+        ORDER BY wi.update_time DESC
+    </select>
+
+    <select id="listInventoryReport" resultType="com.bikeassembly.vo.report.InventoryReportVO">
+        <include refid="inventoryReportSelect"/>
+        <include refid="inventoryReportWhere"/>
+        ORDER BY wi.update_time DESC
+    </select>
+
+    <!-- ==================== 质量检验报表 ==================== -->
+    <sql id="qualityReportSelect">
+        SELECT
+            qi.inspection_id   AS inspectionId,
+            qi.inspection_no   AS inspectionNo,
+            qi.work_order_id   AS workOrderId,
+            wo.work_order_no   AS workOrderNo,
+            bi.item_name       AS itemName,
+            bi.item_code       AS itemCode,
+            qi.result          AS result,
+            qi.inspector       AS inspector,
+            qi.inspection_time AS inspectionTime,
+            qi.status          AS status
+        FROM qms_inspection qi
+        LEFT JOIN pro_work_order wo ON wo.work_order_id = qi.work_order_id
+        LEFT JOIN base_item bi ON bi.item_id = wo.item_id
+    </sql>
+
+    <sql id="qualityReportWhere">
+        <where>
+            <if test="dto.startTime != null and dto.startTime != ''">
+                AND qi.inspection_time &gt;= #{dto.startTime}
+            </if>
+            <if test="dto.endTime != null and dto.endTime != ''">
+                AND qi.inspection_time &lt;= #{dto.endTime}
+            </if>
+            <if test="dto.result != null and dto.result != ''">
+                AND qi.result = #{dto.result}
+            </if>
+            <if test="dto.workOrderId != null">
+                AND qi.work_order_id = #{dto.workOrderId}
+            </if>
+            <!-- 数据权限：SELF 只看当前用户检验的记录 -->
+            <if test="userId != null">
+                AND qi.inspector_user_id = #{userId}
+            </if>
+        </where>
+    </sql>
+
+    <select id="queryQualityReport" resultType="com.bikeassembly.vo.report.QualityReportVO">
+        <include refid="qualityReportSelect"/>
+        <include refid="qualityReportWhere"/>
+        ORDER BY qi.inspection_time DESC
+    </select>
+
+    <select id="listQualityReport" resultType="com.bikeassembly.vo.report.QualityReportVO">
+        <include refid="qualityReportSelect"/>
+        <include refid="qualityReportWhere"/>
+        ORDER BY qi.inspection_time DESC
+    </select>
+
+    <!-- ==================== 设备维修报表 ==================== -->
+    <sql id="equipmentRepairReportSelect">
+        SELECT
+            er.repair_id       AS repairId,
+            er.equipment_id    AS equipmentId,
+            be.equipment_code  AS equipmentCode,
+            be.equipment_name  AS equipmentName,
+            er.fault_desc      AS faultDesc,
+            er.report_user     AS reportUser,
+            er.repair_user     AS repairUser,
+            er.status          AS status,
+            er.report_time     AS reportTime,
+            er.finish_time     AS finishTime,
+            er.result_desc     AS resultDesc
+        FROM eqm_repair_order er
+        LEFT JOIN base_equipment be ON be.equipment_id = er.equipment_id
+    </sql>
+
+    <sql id="equipmentRepairReportWhere">
+        <where>
+            <if test="dto.startTime != null and dto.startTime != ''">
+                AND er.report_time &gt;= #{dto.startTime}
+            </if>
+            <if test="dto.endTime != null and dto.endTime != ''">
+                AND er.report_time &lt;= #{dto.endTime}
+            </if>
+            <if test="dto.equipmentId != null">
+                AND er.equipment_id = #{dto.equipmentId}
+            </if>
+            <if test="dto.status != null and dto.status != ''">
+                AND er.status = #{dto.status}
+            </if>
+            <!-- 数据权限：SELF 看本人上报或本人处理的维修单 -->
+            <if test="userId != null">
+                AND (er.reporter_user_id = #{userId} OR er.handler_user_id = #{userId})
+            </if>
+        </where>
+    </sql>
+
+    <select id="queryEquipmentRepairReport" resultType="com.bikeassembly.vo.report.EquipmentRepairReportVO">
+        <include refid="equipmentRepairReportSelect"/>
+        <include refid="equipmentRepairReportWhere"/>
+        ORDER BY er.report_time DESC
+    </select>
+
+    <select id="listEquipmentRepairReport" resultType="com.bikeassembly.vo.report.EquipmentRepairReportVO">
+        <include refid="equipmentRepairReportSelect"/>
+        <include refid="equipmentRepairReportWhere"/>
+        ORDER BY er.report_time DESC
+    </select>
+
+    <!-- ==================== 安灯告警报表 ==================== -->
+    <sql id="andonReportSelect">
+        SELECT
+            aa.alert_id       AS alertId,
+            aa.alert_no       AS alertNo,
+            aa.alert_type     AS alertType,
+            aa.alert_level    AS alertLevel,
+            aa.unit_id        AS unitId,
+            bwu.unit_name     AS unitName,
+            aa.equipment_id   AS equipmentId,
+            aa.status         AS status,
+            aa.create_time    AS createTime,
+            aa.handle_time    AS handleTime
+        FROM andon_alert aa
+        LEFT JOIN base_work_unit bwu ON bwu.unit_id = aa.unit_id
+    </sql>
+
+    <sql id="andonReportWhere">
+        <where>
+            <if test="dto.startTime != null and dto.startTime != ''">
+                AND aa.create_time &gt;= #{dto.startTime}
+            </if>
+            <if test="dto.endTime != null and dto.endTime != ''">
+                AND aa.create_time &lt;= #{dto.endTime}
+            </if>
+            <if test="dto.alertType != null and dto.alertType != ''">
+                AND aa.alert_type = #{dto.alertType}
+            </if>
+            <if test="dto.level != null and dto.level != ''">
+                AND aa.alert_level = #{dto.level}
+            </if>
+            <if test="dto.status != null and dto.status != ''">
+                AND aa.status = #{dto.status}
+            </if>
+            <!-- 数据权限：SELF 看本人上报或本人处理的告警 -->
+            <if test="userId != null">
+                AND (aa.reporter_user_id = #{userId} OR aa.handler_user_id = #{userId})
+            </if>
+        </where>
+    </sql>
+
+    <select id="queryAndonReport" resultType="com.bikeassembly.vo.report.AndonReportVO">
+        <include refid="andonReportSelect"/>
+        <include refid="andonReportWhere"/>
+        ORDER BY aa.create_time DESC
+    </select>
+
+    <select id="listAndonReport" resultType="com.bikeassembly.vo.report.AndonReportVO">
+        <include refid="andonReportSelect"/>
+        <include refid="andonReportWhere"/>
+        ORDER BY aa.create_time DESC
+    </select>
+
+</mapper>

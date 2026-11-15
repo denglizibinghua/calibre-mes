@@ -1,0 +1,6425 @@
+openapi: 3.0.3
+info:
+  title: Bike Assembly MES API
+  description: 自行车装配 MES 系统后端接口文档
+  version: "3.4"
+  contact:
+    name: Bike Assembly Team
+servers:
+  - url: http://localhost:8080
+    description: 本地开发环境
+security:
+  - AdminToken: []
+components:
+  securitySchemes:
+    AppToken:
+      type: apiKey
+      in: header
+      name: token
+      description: App专属签名密钥签发的正式Access Token，不接受管理端或首次绑定临时凭据
+    AdminToken:
+      type: apiKey
+      in: header
+      name: token
+      description: JWT 管理端令牌，登录接口返回
+  schemas:
+    ScanResolveDTO:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: BIKE-MES:1:WORK_ORDER:<正整数ID>，或完整工单编号条形码；不接受URL、页面路径或凭据。
+    WorkOrderQrCodeVO:
+      type: object
+      required: [workOrderId, workOrderNo, content]
+      properties:
+        workOrderId: {type: integer, format: int64}
+        workOrderNo: {type: string}
+        content: {type: string, description: '标准协议 BIKE-MES:1:WORK_ORDER:<ID>，不是登录凭据'}
+    ScanResolveVO:
+      type: object
+      required: [businessType, workOrderId, workOrderNo, actions, pendingInspectionCount]
+      properties:
+        businessType: {type: string, enum: [WORK_ORDER]}
+        workOrderId: {type: integer, format: int64}
+        workOrderNo: {type: string}
+        actions:
+          type: array
+          items: {type: string, enum: [WORK_ORDER_DETAIL, WORK_PROCESS, INSPECTION_PENDING]}
+          description: 后端校验现有权限及数据归属后返回；前端只映射固定页面，后续业务接口仍独立鉴权。
+        pendingInspectionCount: {type: integer, format: int64, minimum: 0}
+    Result:
+      type: object
+      description: 统一响应包装
+      properties:
+        code:
+          type: integer
+          description: |
+            状态码：
+            - 1：成功
+            - 0：业务错误
+            - 400：参数校验错误
+            - 401：未登录/登录失效
+            - 403：无权限
+            - 500：服务器未知异常
+          example: 1
+        msg:
+          type: string
+          description: 提示信息
+          example: success
+        data:
+          type: object
+          description: 响应数据（泛型，具体类型见各接口）
+        path:
+          type: string
+          description: 请求路径（仅异常时返回）
+        timestamp:
+          type: string
+          format: date-time
+          description: 时间戳（仅异常时返回）
+        requestId:
+          type: string
+          description: 请求追踪 ID（仅异常时返回）
+    ResultVoid:
+      description: 无数据的成功响应
+      allOf:
+        - $ref: '#/components/schemas/Result'
+        - type: object
+          properties:
+            data:
+              type: object
+              nullable: true
+              example: null
+    PageResult:
+      type: object
+      description: 分页结果（V2.2 增强版）
+      properties:
+        records:
+          type: array
+          description: 当前页数据
+        total:
+          type: integer
+          format: int64
+          description: 总记录数
+        current:
+          type: integer
+          description: 当前页码（从 1 开始，前端使用此字段）
+        page:
+          type: integer
+          description: 当前页码（current 别名）
+        size:
+          type: integer
+          description: 每页条数
+        pages:
+          type: integer
+          description: 总页数
+    UserLoginDTO:
+      type: object
+      description: 登录请求
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: 登录账号
+          example: admin
+        password:
+          type: string
+          description: 密码
+          example: '123456'
+    WxLoginDTO:
+      type: object
+      description: 微信小程序登录请求
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          description: 'wx.login 返回的临时 code'
+        nickname:
+          type: string
+          description: 微信昵称（可选）
+        avatar:
+          type: string
+          description: 微信头像 URL（可选）
+    WxBindDTO:
+      type: object
+      description: 验证并绑定已有系统账号；不支持自行注册或选择角色
+      required:
+        - bindType
+        - username
+        - password
+      properties:
+        bindType:
+          type: string
+          description: '绑定类型：existing（绑定已有账号）/ new（注册新账号）'
+          enum: [existing, new]
+        username:
+          type: string
+          description: 已有账号用户名（bindType=existing 时必填）
+        password:
+          type: string
+          description: 已有账号密码（bindType=existing 时必填）
+        nickname:
+          type: string
+          description: 新账号昵称（bindType=new 时必填）
+        roleId:
+          type: integer
+          format: int64
+          description: 新账号角色ID（bindType=new 时必填）
+    # ==================== 认证 Schema ====================
+    UserLoginVO:
+      type: object
+      description: 管理端登录响应 — 双 Token 认证
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 用户ID
+        username:
+          type: string
+          description: 登录账号
+        nickname:
+          type: string
+          description: 用户姓名
+        roleId:
+          type: integer
+          format: int64
+          description: 角色ID
+        token:
+          type: string
+          description: '【已弃用】兼容字段，内容始终等于 accessToken'
+          deprecated: true
+        accessToken:
+          type: string
+          description: Access Token（短有效期，默认 1800 秒）
+        refreshToken:
+          type: string
+          description: Refresh Token（长有效期，默认 604800 秒）
+        tokenType:
+          type: string
+          description: Token 类型，固定为 "Bearer"
+        expiresIn:
+          type: integer
+          format: int64
+          description: Access Token 有效期（秒）
+        refreshExpiresIn:
+          type: integer
+          format: int64
+          description: Refresh Token 有效期（秒）
+        mustChangePassword:
+          type: integer
+          description: 是否必须修改密码（0=否 1=是）
+        passwordExpired:
+          type: boolean
+          description: 密码是否已过期
+        permissions:
+          type: array
+          items:
+            type: string
+          description: 权限码列表
+        dataScope:
+          type: string
+          description: 数据范围（SELF / ALL）
+    WxLoginVO:
+      type: object
+      description: 微信小程序登录响应 — 双 Token 认证
+      properties:
+        status:
+          type: integer
+          description: '登录状态：1=完整登录 2=需选角色 3=需绑定'
+        userId:
+          type: integer
+          format: int64
+        username:
+          type: string
+        nickname:
+          type: string
+        roleId:
+          type: integer
+          format: int64
+        token:
+          type: string
+          description: '【已弃用】兼容字段，内容始终等于 accessToken'
+          deprecated: true
+        accessToken:
+          type: string
+          description: Access Token（短有效期）
+        refreshToken:
+          type: string
+          description: Refresh Token（长有效期）
+        tokenType:
+          type: string
+        expiresIn:
+          type: integer
+          format: int64
+        refreshExpiresIn:
+          type: integer
+          format: int64
+        mustChangePassword:
+          type: integer
+        passwordExpired:
+          type: boolean
+        needBind:
+          type: boolean
+          description: 是否需要绑定账号
+        tempToken:
+          type: string
+          description: 临时 Token（status=2,3 时返回，5 分钟有效）
+        availableRoles:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleOption'
+        userInfo:
+          $ref: '#/components/schemas/UserInfo'
+    WxBindVO:
+      type: object
+      description: 微信账号绑定/注册响应 — 双 Token 认证
+      properties:
+        userId:
+          type: integer
+          format: int64
+        username:
+          type: string
+        nickname:
+          type: string
+        roleId:
+          type: integer
+          format: int64
+        token:
+          type: string
+          description: '【已弃用】兼容字段，内容始终等于 accessToken'
+          deprecated: true
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        tokenType:
+          type: string
+        expiresIn:
+          type: integer
+          format: int64
+        refreshExpiresIn:
+          type: integer
+          format: int64
+        mustChangePassword:
+          type: integer
+        passwordExpired:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            type: string
+        dataScope:
+          type: string
+    UserInfo:
+      type: object
+      description: 内嵌用户信息
+      properties:
+        userId:
+          type: integer
+          format: int64
+        username:
+          type: string
+        nickname:
+          type: string
+        roleId:
+          type: integer
+          format: int64
+        permissions:
+          type: array
+          items:
+            type: string
+        dataScope:
+          type: string
+    RoleOption:
+      type: object
+      properties:
+        roleId:
+          type: integer
+          format: int64
+        roleName:
+          type: string
+    # ==================== 安全错误码 Schema ====================
+    SecurityErrorData:
+      type: object
+      description: 安全状态错误附加数据（在 Result.data 中返回）
+      properties:
+        errorCode:
+          type: string
+          description: '机器可读错误码：SECURITY_PASSWORD_CHANGE_REQUIRED / TOKEN_EXPIRED / REFRESH_TOKEN_INVALID / REFRESH_TOKEN_REUSED'
+        mustChangePassword:
+          type: boolean
+        passwordExpired:
+          type: boolean
+    RefreshTokenResponse:
+      type: object
+      description: Token 刷新响应
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        tokenType:
+          type: string
+        expiresIn:
+          type: integer
+          format: int64
+    UserProfileVO:
+      type: object
+      description: 当前用户档案（GET /app/user/me）
+      properties:
+        userId:
+          type: integer
+          format: int64
+        username:
+          type: string
+        nickname:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        dataScope:
+          type: string
+        mustChangePassword:
+          type: integer
+        passwordExpired:
+          type: boolean
+    SysUserDTO:
+      type: object
+      description: 系统用户 - 新增/编辑请求
+      required:
+        - username
+        - password
+      properties:
+        userId:
+          type: integer
+          format: int64
+          description: 用户ID（编辑时传入）
+        username:
+          type: string
+          description: 登录账号
+        password:
+          type: string
+          description: 密码密文
+          maxLength: 128
+        nickname:
+          type: string
+          description: 用户姓名
+        phone:
+          type: string
+          description: 手机号
+        roleId:
+          type: integer
+          format: int64
+          description: 角色ID（FK → sys_role.role_id）
+        status:
+          type: string
+          description: 状态（0-停用 1-启用）
+          maxLength: 1
+    SysUserVO:
+      type: object
+      description: 系统用户响应（不含密码，密码永不出现在响应中）
+      properties:
+        userId:
+          type: integer
+          format: int64
+        username:
+          type: string
+        nickname:
+          type: string
+        phone:
+          type: string
+        roleId:
+          type: integer
+          format: int64
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+    SysRoleDTO:
+      type: object
+      description: 角色 - 新增/编辑请求
+      required:
+        - roleName
+        - roleKey
+      properties:
+        roleId:
+          type: integer
+          format: int64
+        roleName:
+          type: string
+          description: 角色名称
+        roleKey:
+          type: string
+          description: 角色编码
+        status:
+          type: string
+          description: 状态
+          maxLength: 1
+    SysRoleVO:
+      type: object
+      description: 角色响应
+      properties:
+        roleId:
+          type: integer
+          format: int64
+        roleName:
+          type: string
+        roleKey:
+          type: string
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+    SysMenuDTO:
+      type: object
+      description: 菜单 - 新增/编辑请求
+      required:
+        - menuName
+      properties:
+        menuId:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+          description: 父菜单ID
+        menuName:
+          type: string
+          description: 菜单名称
+        path:
+          type: string
+          description: 路由路径
+        perms:
+          type: string
+          description: 权限标识
+        menuType:
+          type: string
+          description: 菜单类型：M=目录，C=菜单，F=按钮
+          maxLength: 1
+          enum: [M, C, F]
+        orderNum:
+          type: integer
+          description: 排序
+        status:
+          type: string
+          maxLength: 1
+    SysMenuVO:
+      type: object
+      description: 菜单响应
+      properties:
+        menuId:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+        menuName:
+          type: string
+        path:
+          type: string
+        perms:
+          type: string
+        menuType:
+          type: string
+          description: 菜单类型：M=目录，C=菜单，F=按钮
+          maxLength: 1
+        orderNum:
+          type: integer
+        status:
+          type: string
+    SysConfigDTO:
+      required:
+        - configKey
+        - configName
+      type: object
+      description: 系统配置 - 新增/编辑请求
+      properties:
+        configId:
+          type: integer
+          format: int64
+        configKey:
+          type: string
+          description: 配置键
+        configValue:
+          type: string
+          description: 配置值
+        configName:
+          type: string
+          description: 配置名称
+        configType:
+          type: string
+          description: 配置类型
+        status:
+          type: string
+          maxLength: 1
+    SysConfigVO:
+      type: object
+      description: 系统配置响应
+      properties:
+        configId:
+          type: integer
+          format: int64
+        configKey:
+          type: string
+        configValue:
+          type: string
+        configName:
+          type: string
+        configType:
+          type: string
+        status:
+          type: string
+        updateTime:
+          type: string
+          format: date-time
+    SysOperLogDTO:
+      type: object
+      description: 操作日志 - 新增/编辑请求
+      properties:
+        logId:
+          type: integer
+          format: int64
+        module:
+          type: string
+          description: 模块
+        operType:
+          type: string
+          description: 操作类型
+        operUser:
+          type: string
+          description: 操作人
+        operIp:
+          type: string
+          description: IP地址
+        requestMethod:
+          type: string
+          description: 请求方式
+        status:
+          type: string
+          maxLength: 1
+        errorMsg:
+          type: string
+          description: 错误信息
+    SysOperLogVO:
+      type: object
+      description: 操作日志响应
+      properties:
+        logId:
+          type: integer
+          format: int64
+        module:
+          type: string
+        operType:
+          type: string
+        operUser:
+          type: string
+        operIp:
+          type: string
+        requestMethod:
+          type: string
+        status:
+          type: string
+        operTime:
+          type: string
+          format: date-time
+        errorMsg:
+          type: string
+    BaseItemDTO:
+      required:
+        - itemCode
+        - itemName
+        - itemType
+        - unit
+      type: object
+      description: 物料 - 新增/编辑请求
+      properties:
+        itemId:
+          type: integer
+          format: int64
+        itemCode:
+          type: string
+          description: 物料编码
+        itemName:
+          type: string
+          description: 物料名称
+        itemType:
+          type: string
+          description: 物料类型
+          maxLength: 1
+        specModel:
+          type: string
+          description: 规格型号
+        unit:
+          type: string
+          description: 单位
+        status:
+          type: string
+          description: 状态
+          maxLength: 1
+    BaseItemVO:
+      type: object
+      description: 物料响应
+      properties:
+        itemId:
+          type: integer
+          format: int64
+        itemCode:
+          type: string
+        itemName:
+          type: string
+        itemType:
+          type: string
+        specModel:
+          type: string
+        unit:
+          type: string
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+    BaseEquipmentDTO:
+      type: object
+      description: 设备 - 新增/编辑请求
+      required:
+        - equipmentCode
+        - equipmentName
+      properties:
+        equipmentId:
+          type: integer
+          format: int64
+        equipmentCode:
+          type: string
+          description: 设备编码
+        equipmentName:
+          type: string
+          description: 设备名称
+        unitId:
+          type: integer
+          format: int64
+          description: 所属生产单元
+        model:
+          type: string
+          description: 规格型号
+        status:
+          type: string
+          description: 设备状态
+          maxLength: 1
+    BaseEquipmentVO:
+      type: object
+      description: 设备响应
+      properties:
+        equipmentId:
+          type: integer
+          format: int64
+        equipmentCode:
+          type: string
+        equipmentName:
+          type: string
+        unitId:
+          type: integer
+          format: int64
+        model:
+          type: string
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+    BaseBomDTO:
+      type: object
+      description: BOM - 新增/编辑请求
+      required:
+        - itemId
+        - bomCode
+        - detailsJson
+      properties:
+        bomId:
+          type: integer
+          format: int64
+        itemId:
+          type: integer
+          format: int64
+          description: 成品物料ID（FK → base_item.item_id）
+        bomCode:
+          type: string
+          description: BOM编码（唯一）
+        version:
+          type: string
+          description: 版本（DB 默认 V1.0，可选）
+        detailsJson:
+          type: string
+          description: 子件明细JSON
+        status:
+          type: string
+          maxLength: 1
+          description: 状态(CHAR(1))
+    BaseBomVO:
+      type: object
+      description: BOM 响应
+      properties:
+        bomId:
+          type: integer
+          format: int64
+        itemId:
+          type: integer
+          format: int64
+        bomCode:
+          type: string
+        version:
+          type: string
+        detailsJson:
+          type: string
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+        updateTime:
+          type: string
+          format: date-time
+    BaseProcessDTO:
+      required:
+        - processCode
+        - processName
+      type: object
+      description: 工序 - 新增/编辑请求
+      properties:
+        processId:
+          type: integer
+          format: int64
+        processCode:
+          type: string
+          description: 工序编码
+        processName:
+          type: string
+          description: 工序名称
+        standardMinutes:
+          type: integer
+          description: 标准工时（分钟）
+        status:
+          type: string
+          maxLength: 1
+    BaseProcessVO:
+      type: object
+      description: 工序响应
+      properties:
+        processId:
+          type: integer
+          format: int64
+        processCode:
+          type: string
+        processName:
+          type: string
+        standardMinutes:
+          type: integer
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+    BaseRouteDTO:
+      type: object
+      description: 工艺路线 - 新增/编辑请求
+      required:
+        - itemId
+        - routeCode
+        - stepsJson
+      properties:
+        routeId:
+          type: integer
+          format: int64
+        itemId:
+          type: integer
+          format: int64
+          description: 产品物料ID（FK → base_item.item_id）
+        routeCode:
+          type: string
+          description: 路线编码（唯一）
+        version:
+          type: string
+          description: 版本（DB 默认 V1.0，可选）
+        stepsJson:
+          type: string
+          description: 工序步骤JSON
+        status:
+          type: string
+          maxLength: 1
+          description: 状态(CHAR(1))
+    BaseRouteVO:
+      type: object
+      description: 工艺路线响应
+      properties:
+        routeId:
+          type: integer
+          format: int64
+        itemId:
+          type: integer
+          format: int64
+        routeCode:
+          type: string
+        version:
+          type: string
+        stepsJson:
+          type: string
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+        updateTime:
+          type: string
+          format: date-time
+    BaseWorkUnitDTO:
+      required:
+        - unitCode
+        - unitName
+        - unitType
+      type: object
+      description: 工作单元 - 新增/编辑请求
+      properties:
+        unitId:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+          description: 父级ID
+        unitCode:
+          type: string
+          description: 单元编码
+        unitName:
+          type: string
+          description: 单元名称
+        unitType:
+          type: string
+          description: 单元类型
+          maxLength: 1
+        leader:
+          type: string
+          description: 负责人
+        status:
+          type: string
+          maxLength: 1
+    BaseWorkUnitVO:
+      type: object
+      description: 工作单元响应
+      properties:
+        unitId:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+        unitCode:
+          type: string
+        unitName:
+          type: string
+        unitType:
+          type: string
+        leader:
+          type: string
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+    ErpSyncLogDTO:
+      type: object
+      description: ERP同步日志 - 新增/编辑请求
+      required:
+        - bizType
+      properties:
+        syncId:
+          type: integer
+          format: int64
+        bizType:
+          type: string
+          description: 业务类型
+        bizId:
+          type: string
+          description: 业务ID
+        syncDirection:
+          type: string
+          description: 同步方向（CHAR(1)）
+          maxLength: 1
+        syncStatus:
+          type: string
+          description: 同步状态（CHAR(1)）
+          maxLength: 1
+        requestData:
+          type: string
+          description: 请求数据
+        responseData:
+          type: string
+          description: 响应数据
+    ErpSyncLogVO:
+      type: object
+      description: ERP同步日志响应
+      properties:
+        syncId:
+          type: integer
+          format: int64
+        bizType:
+          type: string
+        bizId:
+          type: string
+        syncDirection:
+          type: string
+        syncStatus:
+          type: string
+        requestData:
+          type: string
+        responseData:
+          type: string
+        syncTime:
+          type: string
+          format: date-time
+    ProWorkOrderDTO:
+      type: object
+      description: 生产工单 - 新增/编辑请求
+      required:
+        - workOrderNo
+        - itemId
+      properties:
+        workOrderId:
+          type: integer
+          format: int64
+        workOrderNo:
+          type: string
+          description: 工单编号
+        orderNo:
+          type: string
+          description: 订单号
+        itemId:
+          type: integer
+          format: int64
+          description: 产品ID（FK → base_item.item_id）
+        planQty:
+          type: number
+          description: 计划数量
+        unit:
+          type: string
+          description: 单位
+        planStartTime:
+          type: string
+          format: date-time
+          description: 计划开始时间
+        planEndTime:
+          type: string
+          format: date-time
+          description: 计划结束时间
+        workUnitId:
+          type: integer
+          format: int64
+          description: 派工单元（FK → base_work_unit.unit_id）
+        routeId:
+          type: integer
+          format: int64
+          description: 工艺路线ID
+        status:
+          type: string
+          description: 工单状态
+          maxLength: 1
+    ProWorkOrderVO:
+      type: object
+      description: 生产工单响应
+      properties:
+        workOrderId:
+          type: integer
+          format: int64
+        workOrderNo:
+          type: string
+        orderNo:
+          type: string
+        itemId:
+          type: integer
+          format: int64
+        planQty:
+          type: number
+        unit:
+          type: string
+        planStartTime:
+          type: string
+          format: date-time
+        planEndTime:
+          type: string
+          format: date-time
+        workUnitId:
+          type: integer
+          format: int64
+        routeId:
+          type: integer
+          format: int64
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+    ProWorkProcessDTO:
+      type: object
+      description: 生产工序流转 - 新增/编辑请求
+      required:
+        - workOrderId
+        - processId
+      properties:
+        processRecordId:
+          type: integer
+          format: int64
+        workOrderId:
+          type: integer
+          format: int64
+          description: 工单ID（FK → pro_work_order.order_id）
+        processId:
+          type: integer
+          format: int64
+          description: 工序ID（FK → base_process.process_id）
+        equipmentId:
+          type: integer
+          format: int64
+          description: 设备ID（选填，FK → base_equipment.equipment_id）
+        operator:
+          type: string
+          description: 操作人
+        startTime:
+          type: string
+          format: date-time
+          description: 开始时间
+        endTime:
+          type: string
+          format: date-time
+          description: 结束时间
+        reportQty:
+          type: number
+          description: 报工数量
+        qcResult:
+          type: string
+          maxLength: 1
+          description: 质检结果 CHAR(1)。枚举：0=待检 1=合格 2=不合格 3=待复检
+        status:
+          type: string
+          maxLength: 1
+          description: 状态 CHAR(1)
+    ProWorkProcessVO:
+      type: object
+      description: 生产工序流转响应
+      properties:
+        processRecordId:
+          type: integer
+          format: int64
+        workOrderId:
+          type: integer
+          format: int64
+        processId:
+          type: integer
+          format: int64
+        equipmentId:
+          type: integer
+          format: int64
+        operator:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        reportQty:
+          type: number
+        qcResult:
+          type: string
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+    QmsInspectionDTO:
+      type: object
+      description: 质检单 - 新增/编辑请求
+      required:
+        - inspectionNo
+        - workOrderId
+      properties:
+        inspectionId:
+          type: integer
+          format: int64
+        inspectionNo:
+          type: string
+          description: 质检单号
+        workOrderId:
+          type: integer
+          format: int64
+          description: 工单ID（FK → pro_work_order.work_order_id）
+        processId:
+          type: integer
+          format: int64
+          description: 工序ID
+        result:
+          type: string
+          description: 检验结果（CHAR(1)：0=待检 1=合格 2=不合格）
+          maxLength: 1
+        detailsJson:
+          type: string
+          description: 质检明细JSON
+        inspector:
+          type: string
+          description: 检验人
+        inspectionTime:
+          type: string
+          format: date-time
+          description: 检验时间
+        status:
+          type: string
+          maxLength: 1
+    QmsInspectionVO:
+      type: object
+      description: 质检单响应
+      properties:
+        inspectionId:
+          type: integer
+          format: int64
+        inspectionNo:
+          type: string
+        workOrderId:
+          type: integer
+          format: int64
+        workOrderNo:
+          type: string
+          nullable: true
+          description: 列表中已授权质检任务关联的工单编号，供小程序展示和搜索
+        processId:
+          type: integer
+          format: int64
+        result:
+          type: string
+        detailsJson:
+          type: string
+        inspector:
+          type: string
+        inspectionTime:
+          type: string
+          format: date-time
+        status:
+          type: string
+    QmsInspectionItemDTO:
+      required:
+        - itemName
+      type: object
+      description: 质检项 - 新增/编辑请求
+      properties:
+        inspectionItemId:
+          type: integer
+          format: int64
+        processId:
+          type: integer
+          format: int64
+          description: 工序ID
+        itemName:
+          type: string
+          description: 质检项名称
+        standard:
+          type: string
+          description: 检验标准
+        checkMethod:
+          type: string
+          description: 检验方式
+        status:
+          type: string
+          maxLength: 1
+    QmsInspectionItemVO:
+      type: object
+      description: 质检项响应
+      properties:
+        inspectionItemId:
+          type: integer
+          format: int64
+        processId:
+          type: integer
+          format: int64
+        itemName:
+          type: string
+        standard:
+          type: string
+        checkMethod:
+          type: string
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+    QmsDefectDTO:
+      type: object
+      description: 缺陷 - 新增/编辑请求
+      properties:
+        defectId:
+          type: integer
+          format: int64
+        inspectionId:
+          type: integer
+          format: int64
+          description: 质检单ID
+        workOrderId:
+          type: integer
+          format: int64
+          description: 工单ID
+        processId:
+          type: integer
+          format: int64
+          description: 工序ID
+        defectType:
+          type: string
+          description: 缺陷类型
+        qty:
+          type: number
+          description: 数量
+        handleResult:
+          type: string
+          description: 处理结果
+        status:
+          type: string
+    QmsDefectVO:
+      type: object
+      description: 缺陷响应
+      properties:
+        defectId:
+          type: integer
+          format: int64
+        inspectionId:
+          type: integer
+          format: int64
+        workOrderId:
+          type: integer
+          format: int64
+        processId:
+          type: integer
+          format: int64
+        defectType:
+          type: string
+        qty:
+          type: number
+        handleResult:
+          type: string
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+    WmsInventoryDTO:
+      type: object
+      description: 库存 - 新增/编辑请求
+      required:
+        - itemId
+        - locationId
+      properties:
+        inventoryId:
+          type: integer
+          format: int64
+        itemId:
+          type: integer
+          format: int64
+          description: 物料ID（FK → base_item.item_id）
+        locationId:
+          type: integer
+          format: int64
+          description: 库位ID（FK → wms_location.location_id）
+        qty:
+          type: number
+          description: 库存数量
+        lockedQty:
+          type: number
+          description: 锁定数量
+        batchNo:
+          type: string
+          description: 批次号
+    WmsInventoryVO:
+      type: object
+      description: 库存响应
+      properties:
+        inventoryId:
+          type: integer
+          format: int64
+        itemId:
+          type: integer
+          format: int64
+        locationId:
+          type: integer
+          format: int64
+        qty:
+          type: number
+        lockedQty:
+          type: number
+        batchNo:
+          type: string
+        updateTime:
+          type: string
+          format: date-time
+    WmsLocationDTO:
+      required:
+        - locationCode
+        - locationName
+        - locationType
+      type: object
+      description: 库位 - 新增/编辑请求
+      properties:
+        locationId:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+          description: 父级ID
+        locationCode:
+          type: string
+          description: 位置编码
+        locationName:
+          type: string
+          description: 位置名称
+        locationType:
+          type: string
+          description: 位置类型
+          maxLength: 1
+        status:
+          type: string
+          maxLength: 1
+    WmsLocationVO:
+      type: object
+      description: 库位响应
+      properties:
+        locationId:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+        locationCode:
+          type: string
+        locationName:
+          type: string
+        locationType:
+          type: string
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+    WmsStockDocDTO:
+      type: object
+      description: 库存单据 - 新增/编辑请求
+      required:
+        - docNo
+        - docType
+      properties:
+        docId:
+          type: integer
+          format: int64
+        docNo:
+          type: string
+          description: 单据编号
+        docType:
+          type: string
+          description: 单据类型（CHAR(1)）
+          maxLength: 1
+        relatedOrderNo:
+          type: string
+          description: 关联单号
+        status:
+          type: string
+          description: 单据状态
+          maxLength: 1
+        detailsJson:
+          type: string
+          description: 明细JSON
+    WmsStockDocVO:
+      type: object
+      description: 库存单据响应
+      properties:
+        docId:
+          type: integer
+          format: int64
+        docNo:
+          type: string
+        docType:
+          type: string
+        relatedOrderNo:
+          type: string
+        status:
+          type: string
+        detailsJson:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+    EqmMaintenanceDTO:
+      type: object
+      description: 设备保养 - 新增/编辑请求
+      required:
+        - equipmentId
+        - maintenanceType
+      properties:
+        maintenanceId:
+          type: integer
+          format: int64
+        equipmentId:
+          type: integer
+          format: int64
+          description: 设备ID（FK → base_equipment.equipment_id）
+        maintenanceType:
+          type: string
+          maxLength: 1
+          description: 维护类型(CHAR(1))
+        planTime:
+          type: string
+          format: date-time
+          description: 计划时间
+        finishTime:
+          type: string
+          format: date-time
+          description: 完成时间
+        responsibleUser:
+          type: string
+          description: 责任人
+        status:
+          type: string
+          maxLength: 1
+          description: 状态(CHAR(1))
+        remark:
+          type: string
+          description: 备注
+    EqmMaintenanceVO:
+      type: object
+      description: 设备保养响应
+      properties:
+        maintenanceId:
+          type: integer
+          format: int64
+        equipmentId:
+          type: integer
+          format: int64
+        maintenanceType:
+          type: string
+        planTime:
+          type: string
+          format: date-time
+        finishTime:
+          type: string
+          format: date-time
+        responsibleUser:
+          type: string
+        status:
+          type: string
+        remark:
+          type: string
+    EqmRepairOrderDTO:
+      type: object
+      description: 设备维修工单 - 新增/编辑请求
+      required:
+        - equipmentId
+        - faultDesc
+      properties:
+        repairId:
+          type: integer
+          format: int64
+        equipmentId:
+          type: integer
+          format: int64
+          description: 设备ID（FK → base_equipment.equipment_id）
+        faultDesc:
+          type: string
+          description: 故障描述
+        reportUser:
+          type: string
+          description: 报修人
+        reportTime:
+          type: string
+          format: date-time
+          description: 报修时间（DB 默认 CURRENT_TIMESTAMP，可选）
+        repairUser:
+          type: string
+          description: 维修人
+        finishTime:
+          type: string
+          format: date-time
+          description: 完成时间
+        status:
+          type: string
+          maxLength: 1
+          description: 状态(CHAR(1))
+        resultDesc:
+          type: string
+          description: 维修结果
+    EqmRepairOrderVO:
+      type: object
+      description: 设备维修工单响应
+      properties:
+        repairId:
+          type: integer
+          format: int64
+        equipmentId:
+          type: integer
+          format: int64
+        faultDesc:
+          type: string
+        reportUser:
+          type: string
+        reportTime:
+          type: string
+          format: date-time
+        repairUser:
+          type: string
+        finishTime:
+          type: string
+          format: date-time
+        status:
+          type: string
+        resultDesc:
+          type: string
+    AndonAlertDTO:
+      type: object
+      description: 安灯告警 - 新增/编辑请求
+      required:
+        - alertNo
+      properties:
+        alertId:
+          type: integer
+          format: int64
+        alertNo:
+          type: string
+          description: 告警编号
+        workOrderId:
+          type: integer
+          format: int64
+          description: 工单ID（FK → pro_work_order.work_order_id）
+        unitId:
+          type: integer
+          format: int64
+          description: 生产单元ID（FK → base_work_unit.unit_id）
+        equipmentId:
+          type: integer
+          format: int64
+          description: 设备ID（FK → base_equipment.equipment_id）
+        alertType:
+          type: string
+          description: 告警类型
+        alertLevel:
+          type: string
+          description: 告警等级（CHAR(1)）
+          maxLength: 1
+        status:
+          type: string
+          maxLength: 1
+        handleTime:
+          type: string
+          format: date-time
+          description: 处理时间
+    AndonAlertVO:
+      type: object
+      description: 安灯告警响应
+      properties:
+        alertId:
+          type: integer
+          format: int64
+        alertNo:
+          type: string
+        workOrderId:
+          type: integer
+          format: int64
+        unitId:
+          type: integer
+          format: int64
+        equipmentId:
+          type: integer
+          format: int64
+        alertType:
+          type: string
+        alertLevel:
+          type: string
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+        handleTime:
+          type: string
+          format: date-time
+    SafSafetyEventDTO:
+      type: object
+      description: 安全事件 - 新增/编辑请求
+      required:
+        - title
+      properties:
+        eventId:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+          description: 父级ID
+        eventType:
+          type: string
+          description: 事件类型（CHAR(1)）
+          maxLength: 1
+        title:
+          type: string
+          description: 事件标题
+        level:
+          type: string
+          description: 风险等级（CHAR(1)）
+          maxLength: 1
+        responsibleUser:
+          type: string
+          description: 责任人
+        status:
+          type: string
+          maxLength: 1
+        eventTime:
+          type: string
+          format: date-time
+          description: 发生时间
+        closeTime:
+          type: string
+          format: date-time
+          description: 关闭时间
+    SafSafetyEventVO:
+      type: object
+      description: 安全事件响应
+      properties:
+        eventId:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+        eventType:
+          type: string
+        title:
+          type: string
+        level:
+          type: string
+        responsibleUser:
+          type: string
+        status:
+          type: string
+        eventTime:
+          type: string
+          format: date-time
+        closeTime:
+          type: string
+          format: date-time
+    SafTrainingDTO:
+      required:
+        - trainingTitle
+      type: object
+      description: 安全培训 - 新增/编辑请求
+      properties:
+        trainingId:
+          type: integer
+          format: int64
+        trainingTitle:
+          type: string
+          description: 培训主题
+        trainingType:
+          type: string
+          description: 培训类型
+        trainer:
+          type: string
+          description: 讲师
+        startTime:
+          type: string
+          format: date-time
+          description: 开始时间
+        endTime:
+          type: string
+          format: date-time
+          description: 结束时间
+        usersJson:
+          type: string
+          description: 参训人员JSON
+        status:
+          type: string
+          maxLength: 1
+    SafTrainingVO:
+      type: object
+      description: 安全培训响应
+      properties:
+        trainingId:
+          type: integer
+          format: int64
+        trainingTitle:
+          type: string
+        trainingType:
+          type: string
+        trainer:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        usersJson:
+          type: string
+        status:
+          type: string
+    WorkOrderReportDTO:
+      type: object
+      description: 工单报表查询参数（全部通过 query string 传递）
+      properties:
+        startTime:
+          type: string
+          description: 开始时间
+        endTime:
+          type: string
+          description: 结束时间
+        status:
+          type: string
+          description: 工单状态
+        itemId:
+          type: integer
+          format: int64
+          description: 产品物料ID
+    WorkOrderReportVO:
+      type: object
+      description: 工单报表明细
+      properties:
+        workOrderId:
+          type: integer
+          format: int64
+        workOrderNo:
+          type: string
+        orderNo:
+          type: string
+        itemId:
+          type: integer
+          format: int64
+        itemCode:
+          type: string
+        itemName:
+          type: string
+        planQty:
+          type: number
+        unit:
+          type: string
+        status:
+          type: string
+        planStartTime:
+          type: string
+          format: date-time
+        planEndTime:
+          type: string
+          format: date-time
+        createTime:
+          type: string
+          format: date-time
+    InventoryReportDTO:
+      type: object
+      description: 库存报表查询参数
+      properties:
+        itemId:
+          type: integer
+          format: int64
+          description: 物料ID
+        locationId:
+          type: integer
+          format: int64
+          description: 库位ID
+        itemType:
+          type: string
+          description: 物料类型
+    InventoryReportVO:
+      type: object
+      description: 库存报表明细
+      properties:
+        inventoryId:
+          type: integer
+          format: int64
+        itemId:
+          type: integer
+          format: int64
+        itemCode:
+          type: string
+        itemName:
+          type: string
+        locationId:
+          type: integer
+          format: int64
+        locationCode:
+          type: string
+        locationName:
+          type: string
+        quantity:
+          type: number
+        lockedQuantity:
+          type: number
+        unit:
+          type: string
+        batchNo:
+          type: string
+        updateTime:
+          type: string
+          format: date-time
+    QualityReportDTO:
+      type: object
+      description: 质量报表查询参数
+      properties:
+        startTime:
+          type: string
+          description: 开始时间
+        endTime:
+          type: string
+          description: 结束时间
+        result:
+          type: string
+          description: 检验结果（PASS/FAIL）
+        workOrderId:
+          type: integer
+          format: int64
+          description: 工单ID
+    QualityReportVO:
+      type: object
+      description: 质量报表明细
+      properties:
+        inspectionId:
+          type: integer
+          format: int64
+        inspectionNo:
+          type: string
+        workOrderId:
+          type: integer
+          format: int64
+        workOrderNo:
+          type: string
+        itemName:
+          type: string
+        itemCode:
+          type: string
+        result:
+          type: string
+        inspector:
+          type: string
+        inspectionTime:
+          type: string
+          format: date-time
+        status:
+          type: string
+    EquipmentRepairReportDTO:
+      type: object
+      description: 设备维修报表查询参数
+      properties:
+        startTime:
+          type: string
+          description: 开始时间
+        endTime:
+          type: string
+          description: 结束时间
+        equipmentId:
+          type: integer
+          format: int64
+          description: 设备ID
+        status:
+          type: string
+          description: 状态
+    EquipmentRepairReportVO:
+      type: object
+      description: 设备维修报表明细
+      properties:
+        repairId:
+          type: integer
+          format: int64
+        equipmentId:
+          type: integer
+          format: int64
+        equipmentCode:
+          type: string
+        equipmentName:
+          type: string
+        faultDesc:
+          type: string
+        reportUser:
+          type: string
+        repairUser:
+          type: string
+        status:
+          type: string
+        reportTime:
+          type: string
+          format: date-time
+        finishTime:
+          type: string
+          format: date-time
+        resultDesc:
+          type: string
+    AndonReportDTO:
+      type: object
+      description: 安灯报表查询参数
+      properties:
+        startTime:
+          type: string
+          description: 开始时间
+        endTime:
+          type: string
+          description: 结束时间
+        alertType:
+          type: string
+          description: 告警类型
+        level:
+          type: string
+          description: 告警等级
+        status:
+          type: string
+          description: 状态
+    AndonReportVO:
+      type: object
+      description: 安灯报表明细
+      properties:
+        alertId:
+          type: integer
+          format: int64
+        alertNo:
+          type: string
+        alertType:
+          type: string
+        alertLevel:
+          type: string
+        unitId:
+          type: integer
+          format: int64
+        unitName:
+          type: string
+        equipmentId:
+          type: integer
+          format: int64
+        status:
+          type: string
+        createTime:
+          type: string
+          format: date-time
+        handleTime:
+          type: string
+          format: date-time
+    HealthData:
+      type: object
+      properties:
+        status:
+          type: string
+          example: UP
+        timestamp:
+          type: string
+          format: date-time
+tags:
+  - name: auth
+    description: 管理端认证（登录、退出、刷新、健康检查）
+  - name: app-auth
+    description: 小程序认证（微信登录、绑定、刷新、退出、用户信息）
+  - name: system-user
+    description: 系统用户管理
+  - name: system-role
+    description: 角色管理
+  - name: system-menu
+    description: 菜单管理
+  - name: system-config
+    description: 系统配置
+  - name: system-oper-log
+    description: 操作日志
+  - name: erp-sync-log
+    description: ERP 同步日志
+  - name: base-item
+    description: 物料管理
+  - name: base-equipment
+    description: 设备台账
+  - name: base-bom
+    description: BOM 管理
+  - name: base-process
+    description: 工序管理
+  - name: base-route
+    description: 工艺路线
+  - name: base-work-unit
+    description: 工作单元
+  - name: pro-work-order
+    description: 生产工单
+  - name: pro-work-process
+    description: 生产工序流转
+  - name: qms-inspection
+    description: 质检单
+  - name: qms-inspection-item
+    description: 质检项
+  - name: qms-defect
+    description: 缺陷管理
+  - name: wms-inventory
+    description: 库存管理
+  - name: wms-location
+    description: 库位管理
+  - name: wms-stock-doc
+    description: 库存单据
+  - name: eqm-maintenance
+    description: 设备保养
+  - name: eqm-repair-order
+    description: 设备维修工单
+  - name: andon-alert
+    description: 安灯告警
+  - name: saf-safety-event
+    description: 安全事件
+  - name: saf-training
+    description: 安全培训
+  - name: report
+    description: 报表查询与导出
+  - name: message-test
+    description: RabbitMQ 消息测试
+paths:
+  /admin/pro-work-order/{id}/qr-code:
+    get:
+      tags: [生产工单]
+      summary: 获取真实工单二维码元数据
+      description: 需要 admin:work-order:view。由前端本地生成并下载二维码PNG，不写数据库。
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer, format: int64, minimum: 1}}
+      responses:
+        '200':
+          description: code=1成功；46003工单不存在或已删除
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/Result'}
+                  - type: object
+                    properties:
+                      data: {$ref: '#/components/schemas/WorkOrderQrCodeVO'}
+        '401': {description: 登录失效}
+        '403': {description: 缺少工单查看权限}
+  /app/scan/resolve:
+    post:
+      security: [{AppToken: []}]
+      tags: [小程序工单扫码]
+      summary: 解析工单码并返回允许的业务入口
+      description: |
+        正式App登录态。按工单查看/工序查看/质检查看各自权限与归属计算入口。
+        纯质检账号无需生产工单查看权限。只定位，不开工、报工、领取或确认。
+        未领取待检任务需 app:inspection:view-pending；他人领取任务不因扫码而放行。
+        46001码无效；46002类型或版本不支持；46003工单不存在；46004暂无可访问待检任务。
+        业务错误使用项目既有Result包装和msg；401/403仍使用对应HTTP状态。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ScanResolveDTO'}
+      responses:
+        '200':
+          description: Result成功或明确业务错误
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/Result'}
+                  - type: object
+                    properties:
+                      data: {$ref: '#/components/schemas/ScanResolveVO'}
+        '401': {description: 请重新登录}
+        '403': {description: 您无权访问该工单的任务}
+  /app/pro-work-order/list:
+    get:
+      security: [{AppToken: []}]
+      tags: [小程序生产工单]
+      summary: 工单列表
+      description: 需要app:work-order:view；all额外需要view-all；mine按当前执行人过滤。
+      parameters:
+        - {name: scope, in: query, schema: {type: string, enum: [mine, all], default: mine}}
+        - {name: workOrderNo, in: query, schema: {type: string}}
+        - {name: orderNo, in: query, schema: {type: string}}
+        - {name: productName, in: query, schema: {type: string}}
+      responses:
+        '200': {description: 'Result<List<ProWorkOrderVO>>，code=1成功'}
+        '401': {description: 登录失效}
+        '403': {description: 无查看权限}
+  /app/pro-work-order/{id}:
+    get:
+      security: [{AppToken: []}]
+      tags: [小程序生产工单]
+      summary: 真实工单详情
+      description: 需要app:work-order:view，并校验本人执行工单或view-all。
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer, format: int64}}
+      responses:
+        '200': {description: 'Result<ProWorkOrderVO>，不存在返回明确业务错误'}
+        '401': {description: 登录失效}
+        '403': {description: 权限或归属不足}
+  /app/pro-work-process/list:
+    get:
+      security: [{AppToken: []}]
+      tags: [小程序生产工序]
+      summary: 工序列表及扫码工单定位
+      description: 需要app:work-process:view；all需要view-all，mine按工单执行人过滤。工单条件在SQL分页前生效。
+      parameters:
+        - {name: scope, in: query, schema: {type: string, enum: [mine, all], default: mine}}
+        - {name: workOrderId, in: query, schema: {type: integer, format: int64, minimum: 1}}
+      responses:
+        '200': {description: 'Result<List<ProWorkProcessVO>>'}
+        '401': {description: 登录失效}
+        '403': {description: 权限或归属不足}
+  /app/qms-inspection/list:
+    get:
+      security: [{AppToken: []}]
+      tags: [小程序质量检验]
+      summary: 可访问质检任务列表及扫码工单定位
+      description: |
+        需要app:inspection:view；all需view-all，pending需view-pending。
+        mine返回本人领取、本人工单未领取的任务；只有view-pending可额外读取其他工单未领取待检池。
+        工单、工序、状态条件在SQL分页前生效，不依赖生产工单查看权限。
+        相比旧实现，mine不再无条件包含未领取任务，属于权限范围修正。
+      parameters:
+        - {name: scope, in: query, schema: {type: string, enum: [mine, pending, all], default: mine}}
+        - {name: workOrderId, in: query, schema: {type: integer, format: int64, minimum: 1}}
+        - {name: processId, in: query, schema: {type: integer, format: int64, minimum: 1}}
+        - {name: status, in: query, schema: {type: string, enum: ['0', '1', '2']}}
+      responses:
+        '200': {description: 'Result<List<QmsInspectionVO>>，workOrderNo由已授权任务关联补充'}
+        '401': {description: 登录失效}
+        '403': {description: 权限或scope不足}
+  /admin/health:
+    get:
+      tags:
+        - auth
+      summary: 健康检查
+      description: 检查服务是否正常运行
+      security: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HealthData'
+  /admin/user/login:
+    post:
+      tags:
+        - auth
+      summary: 用户登录
+      description: 使用用户名和密码登录，返回 JWT 令牌
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLoginDTO'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserLoginVO'
+        '401':
+          description: 用户名或密码错误
+  /admin/user/logout:
+    post:
+      tags:
+        - auth
+      summary: 管理端安全退出
+      description: 撤销当前 Refresh Token 会话。请求需携带 accessToken（可选，用于获取 tokenJti）
+      security: []
+      responses:
+        '200':
+          description: 退出成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/user/refresh-token:
+    post:
+      tags:
+        - auth
+      summary: 管理端刷新 Token（Token Rotation）
+      description: 使用 Refresh Token 换发新的 Access Token + Refresh Token。旧 Refresh Token 被撤销。
+      security: []
+      parameters:
+        - in: header
+          name: token
+          required: true
+          schema:
+            type: string
+          description: Refresh Token
+      responses:
+        '200':
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RefreshTokenResponse'
+        '401':
+          description: Refresh Token 无效或已过期
+  /app/user/wx-login:
+    post:
+      tags:
+        - app-auth
+      summary: 微信小程序登录
+      description: 小程序调用 wx.login 获取 code 后换取双 Token。已绑定系统账号的用户按其数据库角色返回完整会话；未绑定用户只返回5分钟临时凭据，需验证并绑定已有系统账号。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WxLoginDTO'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WxLoginVO'
+  /app/user/wx-bind:
+    post:
+      tags:
+        - app-auth
+      summary: 微信账号绑定/注册
+      description: 验证已有系统账号密码后绑定微信，身份和权限沿用系统账号；拒绝注册选角色，成功后返回双 Token。
+      security: []
+      parameters:
+        - in: header
+          name: token
+          required: true
+          schema:
+            type: string
+          description: 临时 Token（wx-login 返回的 tempToken）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WxBindDTO'
+      responses:
+        '200':
+          description: 绑定成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WxBindVO'
+  /app/user/refresh-token:
+    post:
+      tags:
+        - app-auth
+      summary: App 刷新 Token（Token Rotation）
+      description: 使用 Refresh Token 换发新的 Access Token + Refresh Token。
+      security: []
+      parameters:
+        - in: header
+          name: token
+          required: true
+          schema:
+            type: string
+          description: Refresh Token
+      responses:
+        '200':
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RefreshTokenResponse'
+        '401':
+          description: Refresh Token 无效或已过期
+  /app/user/logout:
+    post:
+      tags:
+        - app-auth
+      summary: App 安全退出
+      description: 撤销当前 Refresh Token 会话。幂等操作，令牌无效时也返回成功。
+      security: []
+      parameters:
+        - in: header
+          name: token
+          required: false
+          schema:
+            type: string
+          description: Refresh Token（可选，用于服务端会话撤销）
+      responses:
+        '200':
+          description: 退出成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /app/user/me:
+    get:
+      tags:
+        - app-auth
+      summary: 获取当前 App 用户档案
+      security: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserProfileVO'
+  /admin/sys-user/change-password:
+    put:
+      tags:
+        - system-user
+      summary: 当前用户修改自己的密码
+      description: 修改密码后所有 Refresh Token 被撤销，需重新登录。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                oldPassword:
+                  type: string
+                  description: 原密码（首次强制改密时可不传）
+                newPassword:
+                  type: string
+                  description: 新密码
+      responses:
+        '200':
+          description: 修改成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/sys-user/{id}/reset-password:
+    put:
+      tags:
+        - system-user
+      summary: 管理员重置用户密码
+      description: 重置后 mustChangePassword=1，用户所有 Refresh Token 被撤销。
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newPassword:
+                  type: string
+                  description: 新密码
+      responses:
+        '200':
+          description: 重置成功
+  /admin/sys-user/{id}/unlock:
+    put:
+      tags:
+        - system-user
+      summary: 管理员解锁账号
+      description: 清零 loginFailCount，清空 lockedUntil。
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 解锁成功
+  /admin/sys-user/list:
+    get:
+      tags:
+        - system-user
+      summary: 查询用户列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+        - name: username
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 登录账号（模糊匹配）
+        - name: nickname
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 用户姓名（模糊匹配）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/sys-user/{id}:
+    get:
+      tags:
+        - system-user
+      summary: 查询用户详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysUserVO'
+    put:
+      tags:
+        - system-user
+      summary: 编辑用户
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SysUserDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysUserVO'
+    delete:
+      tags:
+        - system-user
+      summary: 删除用户
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/sys-user:
+    post:
+      tags:
+        - system-user
+      summary: 新增用户
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SysUserDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysUserVO'
+  /admin/sys-role/list:
+    get:
+      tags:
+        - system-role
+      summary: 查询角色列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/sys-role/{id}:
+    get:
+      tags:
+        - system-role
+      summary: 查询角色详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysRoleVO'
+    put:
+      tags:
+        - system-role
+      summary: 编辑角色
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SysRoleDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysRoleVO'
+    delete:
+      tags:
+        - system-role
+      summary: 删除角色
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/sys-role:
+    post:
+      tags:
+        - system-role
+      summary: 新增角色
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SysRoleDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysRoleVO'
+  /admin/sys-menu/list:
+    get:
+      tags:
+        - system-menu
+      summary: 查询菜单列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/sys-menu/{id}:
+    get:
+      tags:
+        - system-menu
+      summary: 查询菜单详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysMenuVO'
+    put:
+      tags:
+        - system-menu
+      summary: 编辑菜单
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SysMenuDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysMenuVO'
+    delete:
+      tags:
+        - system-menu
+      summary: 删除菜单
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/sys-menu:
+    post:
+      tags:
+        - system-menu
+      summary: 新增菜单
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SysMenuDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysMenuVO'
+  /admin/sys-config/list:
+    get:
+      tags:
+        - system-config
+      summary: 查询配置列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+        - name: configKey
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 配置键（模糊匹配）
+        - name: configName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 配置名称（模糊匹配）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/sys-config/{id}:
+    get:
+      tags:
+        - system-config
+      summary: 查询配置详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysConfigVO'
+    put:
+      tags:
+        - system-config
+      summary: 编辑配置
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SysConfigDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysConfigVO'
+    delete:
+      tags:
+        - system-config
+      summary: 删除配置
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/sys-config:
+    post:
+      tags:
+        - system-config
+      summary: 新增配置
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SysConfigDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysConfigVO'
+  /admin/sys-oper-log/list:
+    get:
+      tags:
+        - system-oper-log
+      summary: 查询操作日志列表（V2.2 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/sys-oper-log/{id}:
+    get:
+      tags:
+        - system-oper-log
+      summary: 查询操作日志详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysOperLogVO'
+    put:
+      tags:
+        - system-oper-log
+      summary: 编辑操作日志
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SysOperLogDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysOperLogVO'
+    delete:
+      tags:
+        - system-oper-log
+      summary: 删除操作日志
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/sys-oper-log:
+    post:
+      tags:
+        - system-oper-log
+      summary: 新增操作日志
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SysOperLogDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SysOperLogVO'
+  /admin/base-item/list:
+    get:
+      tags:
+        - base-item
+      summary: 查询物料列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+        - name: itemCode
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 物料编码（模糊匹配）
+        - name: itemName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 物料名称（模糊匹配）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/base-item/{id}:
+    get:
+      tags:
+        - base-item
+      summary: 查询物料详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseItemVO'
+    put:
+      tags:
+        - base-item
+      summary: 编辑物料
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaseItemDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseItemVO'
+    delete:
+      tags:
+        - base-item
+      summary: 删除物料
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/base-item:
+    post:
+      tags:
+        - base-item
+      summary: 新增物料
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaseItemDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseItemVO'
+  /admin/base-equipment/list:
+    get:
+      tags:
+        - base-equipment
+      summary: 查询设备列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+        - name: equipmentCode
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 设备编码（模糊匹配）
+        - name: equipmentName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 设备名称（模糊匹配）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/base-equipment/{id}:
+    get:
+      tags:
+        - base-equipment
+      summary: 查询设备详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseEquipmentVO'
+    put:
+      tags:
+        - base-equipment
+      summary: 编辑设备
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaseEquipmentDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseEquipmentVO'
+    delete:
+      tags:
+        - base-equipment
+      summary: 删除设备
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/base-equipment:
+    post:
+      tags:
+        - base-equipment
+      summary: 新增设备
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaseEquipmentDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseEquipmentVO'
+  /admin/base-bom/list:
+    get:
+      tags:
+        - base-bom
+      summary: 查询 BOM 列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/base-bom/{id}:
+    get:
+      tags:
+        - base-bom
+      summary: 查询 BOM 详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseBomVO'
+    put:
+      tags:
+        - base-bom
+      summary: 编辑 BOM
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaseBomDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseBomVO'
+    delete:
+      tags:
+        - base-bom
+      summary: 删除 BOM
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/base-bom:
+    post:
+      tags:
+        - base-bom
+      summary: 新增 BOM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaseBomDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseBomVO'
+  /admin/base-process/list:
+    get:
+      tags:
+        - base-process
+      summary: 查询工序列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/base-process/{id}:
+    get:
+      tags:
+        - base-process
+      summary: 查询工序详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseProcessVO'
+    put:
+      tags:
+        - base-process
+      summary: 编辑工序
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaseProcessDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseProcessVO'
+    delete:
+      tags:
+        - base-process
+      summary: 删除工序
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/base-process:
+    post:
+      tags:
+        - base-process
+      summary: 新增工序
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaseProcessDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseProcessVO'
+  /admin/base-route/list:
+    get:
+      tags:
+        - base-route
+      summary: 查询工艺路线列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/base-route/{id}:
+    get:
+      tags:
+        - base-route
+      summary: 查询工艺路线详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseRouteVO'
+    put:
+      tags:
+        - base-route
+      summary: 编辑工艺路线
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaseRouteDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseRouteVO'
+    delete:
+      tags:
+        - base-route
+      summary: 删除工艺路线
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/base-route:
+    post:
+      tags:
+        - base-route
+      summary: 新增工艺路线
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaseRouteDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseRouteVO'
+  /admin/base-work-unit/list:
+    get:
+      tags:
+        - base-work-unit
+      summary: 查询工作单元列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/base-work-unit/{id}:
+    get:
+      tags:
+        - base-work-unit
+      summary: 查询工作单元详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseWorkUnitVO'
+    put:
+      tags:
+        - base-work-unit
+      summary: 编辑工作单元
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaseWorkUnitDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseWorkUnitVO'
+    delete:
+      tags:
+        - base-work-unit
+      summary: 删除工作单元
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/base-work-unit:
+    post:
+      tags:
+        - base-work-unit
+      summary: 新增工作单元
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaseWorkUnitDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BaseWorkUnitVO'
+  /admin/erp-sync-log/list:
+    get:
+      tags:
+        - erp-sync-log
+      summary: 查询 ERP 同步日志列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/erp-sync-log/{id}:
+    get:
+      tags:
+        - erp-sync-log
+      summary: 查询 ERP 同步日志详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ErpSyncLogVO'
+    put:
+      tags:
+        - erp-sync-log
+      summary: 编辑 ERP 同步日志
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErpSyncLogDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ErpSyncLogVO'
+    delete:
+      tags:
+        - erp-sync-log
+      summary: 删除 ERP 同步日志
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/erp-sync-log:
+    post:
+      tags:
+        - erp-sync-log
+      summary: 新增 ERP 同步日志
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErpSyncLogDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ErpSyncLogVO'
+  /admin/pro-work-order/list:
+    get:
+      tags:
+        - pro-work-order
+      summary: 查询生产工单列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+        - name: orderNo
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 订单号（模糊匹配）
+        - name: productName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 产品名称（模糊匹配）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/pro-work-order/{id}:
+    get:
+      tags:
+        - pro-work-order
+      summary: 查询生产工单详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProWorkOrderVO'
+    put:
+      tags:
+        - pro-work-order
+      summary: 编辑生产工单
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProWorkOrderDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProWorkOrderVO'
+    delete:
+      tags:
+        - pro-work-order
+      summary: 删除生产工单
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/pro-work-order:
+    post:
+      tags:
+        - pro-work-order
+      summary: 新增生产工单
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProWorkOrderDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProWorkOrderVO'
+
+  # ==================== V3.4 工单状态转换 ====================
+
+  /admin/pro-work-order/{id}/release:
+    put:
+      tags: [pro-work-order]
+      summary: 下达工单 (V3.4)
+      description: CREATED(0) → RELEASED(4)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200": { description: 成功 }
+        "409": { description: 状态冲突或并发冲突 }
+
+  /admin/pro-work-order/{id}/pause:
+    put:
+      tags: [pro-work-order]
+      summary: 暂停工单 (V3.4)
+      description: IN_PROGRESS(1) → PAUSED(5)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200": { description: 成功 }
+
+  /admin/pro-work-order/{id}/resume:
+    put:
+      tags: [pro-work-order]
+      summary: 恢复工单 (V3.4)
+      description: PAUSED(5) → IN_PROGRESS(1)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200": { description: 成功 }
+
+  /admin/pro-work-order/{id}/close:
+    put:
+      tags: [pro-work-order]
+      summary: 关闭工单 (V3.4)
+      description: COMPLETED(2) → CLOSED(3)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200": { description: 成功 }
+
+  /admin/pro-work-order/{id}/cancel:
+    put:
+      tags: [pro-work-order]
+      summary: 取消工单 (V3.4)
+      description: CREATED(0) 或 RELEASED(4) → CANCELLED(6)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+        - name: remark
+          in: query
+          schema: { type: string }
+      responses:
+        "200": { description: 成功 }
+# ==================== V3.4 工序状态转换 ====================  /admin/pro-work-process/{id}/qc-pass:    put:      tags: [pro-work-process]      summary: 质检通过 (V3.4)      description: WAIT_INSPECTION(3) → QUALIFIED(4) → COMPLETED(2)      parameters:        - name: id          in: path          required: true          schema: { type: integer, format: int64 }        - name: qcNote          in: query          schema: { type: string }      responses:        200: { description: 成功 }  /admin/pro-work-process/{id}/qc-fail:    put:      tags: [pro-work-process]      summary: 质检驳回 (V3.4)      description: WAIT_INSPECTION(3) → REJECTED(5)      parameters:        - name: id          in: path          required: true          schema: { type: integer, format: int64 }        - name: qcNote          in: query          schema: { type: string }      responses:        200: { description: 成功 }  /admin/pro-work-process/{id}/rework-start:    put:      tags: [pro-work-process]      summary: 发起返工 (V3.4)      description: REJECTED(5) → REWORK(6)      parameters:        - name: id          in: path          required: true          schema: { type: integer, format: int64 }      responses:        200: { description: 成功 }  /admin/pro-work-process/{id}/rework-complete:    put:      tags: [pro-work-process]      summary: 返工完成 (V3.4)      description: REWORK(6) → WAIT_INSPECTION(3) (必须重新质检)      parameters:        - name: id          in: path          required: true          schema: { type: integer, format: int64 }        - name: reportQty          in: query          schema: { type: number }      responses:        200: { description: 成功 }  /admin/pro-work-process/{id}/skip:    put:      tags: [pro-work-process]      summary: 跳过工序 (V3.4)      description: PENDING(0) 或 READY(9) → SKIPPED(7)      parameters:        - name: id          in: path          required: true          schema: { type: integer, format: int64 }        - name: remark          in: query          schema: { type: string }      responses:        200: { description: 成功 }  /admin/pro-work-process/{id}/cancel:    put:      tags: [pro-work-process]      summary: 取消工序 (V3.4)      description: PENDING(0) → CANCELLED(8)      parameters:        - name: id          in: path          required: true          schema: { type: integer, format: int64 }        - name: remark          in: query          schema: { type: string }      responses:        200: { description: 成功 }
+  /admin/pro-work-process/list:
+    get:
+      tags:
+        - pro-work-process
+      summary: 查询生产工序流转列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/pro-work-process/{id}:
+    get:
+      tags:
+        - pro-work-process
+      summary: 查询生产工序流转详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProWorkProcessVO'
+    put:
+      tags:
+        - pro-work-process
+      summary: 编辑生产工序流转
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProWorkProcessDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProWorkProcessVO'
+    delete:
+      tags:
+        - pro-work-process
+      summary: 删除生产工序流转
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/pro-work-process:
+    post:
+      tags:
+        - pro-work-process
+      summary: 新增生产工序流转
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProWorkProcessDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProWorkProcessVO'
+  /admin/qms-inspection/list:
+    get:
+      tags:
+        - qms-inspection
+      summary: 查询质检单列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+        - name: inspectionNo
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 质检单号（模糊匹配）
+        - name: itemName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 物料名称（模糊匹配）
+        - name: inspector
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 检验人（模糊匹配）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/qms-inspection/{id}:
+    get:
+      tags:
+        - qms-inspection
+      summary: 查询质检单详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QmsInspectionVO'
+    put:
+      tags:
+        - qms-inspection
+      summary: 编辑质检单
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QmsInspectionDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QmsInspectionVO'
+    delete:
+      tags:
+        - qms-inspection
+      summary: 删除质检单
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/qms-inspection:
+    post:
+      tags:
+        - qms-inspection
+      summary: 新增质检单
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QmsInspectionDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QmsInspectionVO'
+
+  # ==================== V3.4 质检状态转换 ====================
+
+  /admin/qms-inspection/{id}/confirm:
+    put:
+      tags: [qms-inspection]
+      summary: 确认质检单 (V3.4)
+      description: ENTERED(1) → CONFIRMED(2)，联动工序状态机
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: 成功 }
+        '409': { description: 并发冲突或重复确认 }
+
+  /admin/qms-inspection-item/list:
+    get:
+      tags:
+        - qms-inspection-item
+      summary: 查询质检项列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/qms-inspection-item/{id}:
+    get:
+      tags:
+        - qms-inspection-item
+      summary: 查询质检项详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QmsInspectionItemVO'
+    put:
+      tags:
+        - qms-inspection-item
+      summary: 编辑质检项
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QmsInspectionItemDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QmsInspectionItemVO'
+    delete:
+      tags:
+        - qms-inspection-item
+      summary: 删除质检项
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/qms-inspection-item:
+    post:
+      tags:
+        - qms-inspection-item
+      summary: 新增质检项
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QmsInspectionItemDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QmsInspectionItemVO'
+
+  # ==================== V3.4 小程序端工序操作 ====================
+
+  /app/pro-work-process/{id}/start:
+    put:
+      tags: [pro-work-process]
+      summary: 工序开工 (V3.4 小程序)
+      description: READY(9) → IN_PROGRESS(1)，首工序开工时工单自动进入 IN_PROGRESS
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: 成功 }
+
+  /app/pro-work-process/{id}/report:
+    put:
+      tags: [pro-work-process]
+      summary: 报工送检 (V3.4 小程序)
+      description: IN_PROGRESS(1) → WAIT_INSPECTION(3)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+        - name: reportQty
+          in: query
+          required: true
+          schema: { type: number }
+        - name: qcResultNote
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: 成功 }
+
+  /app/pro-work-process/{id}/report-complete:
+    put:
+      tags: [pro-work-process]
+      summary: 报工完成 (V3.4 小程序)
+      description: IN_PROGRESS(1) → COMPLETED(2)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+        - name: reportQty
+          in: query
+          required: true
+          schema: { type: number }
+      responses:
+        '200': { description: 成功 }
+
+  /app/pro-work-process/{id}/rework-start:
+    put:
+      tags: [pro-work-process]
+      summary: 发起返工 (V3.4 小程序)
+      description: REJECTED(5) → REWORK(6)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: 成功 }
+
+  /app/pro-work-process/{id}/rework-complete:
+    put:
+      tags: [pro-work-process]
+      summary: 返工完成 (V3.4 小程序)
+      description: REWORK(6) → WAIT_INSPECTION(3)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+        - name: reportQty
+          in: query
+          schema: { type: number }
+      responses:
+        '200': { description: 成功 }
+
+  /admin/qms-defect/list:
+    get:
+      tags:
+        - qms-defect
+      summary: 查询缺陷列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/qms-defect/{id}:
+    get:
+      tags:
+        - qms-defect
+      summary: 查询缺陷详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QmsDefectVO'
+    put:
+      tags:
+        - qms-defect
+      summary: 编辑缺陷
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QmsDefectDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QmsDefectVO'
+    delete:
+      tags:
+        - qms-defect
+      summary: 删除缺陷
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/qms-defect:
+    post:
+      tags:
+        - qms-defect
+      summary: 新增缺陷
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QmsDefectDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QmsDefectVO'
+  /admin/wms-inventory/list:
+    get:
+      tags:
+        - wms-inventory
+      summary: 查询库存列表（V2.2 分页）
+      parameters:
+        - name: itemCode
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 物料编码（模糊匹配）
+        - name: itemName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 物料名称（模糊匹配）
+        - name: warehouseName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 仓库名称（模糊匹配）
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/wms-inventory/{id}:
+    get:
+      tags:
+        - wms-inventory
+      summary: 查询库存详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WmsInventoryVO'
+    put:
+      tags:
+        - wms-inventory
+      summary: 编辑库存
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WmsInventoryDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WmsInventoryVO'
+    delete:
+      tags:
+        - wms-inventory
+      summary: 删除库存
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/wms-inventory:
+    post:
+      tags:
+        - wms-inventory
+      summary: 新增库存
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WmsInventoryDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WmsInventoryVO'
+  /admin/wms-location/list:
+    get:
+      tags:
+        - wms-location
+      summary: 查询库位列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/wms-location/{id}:
+    get:
+      tags:
+        - wms-location
+      summary: 查询库位详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WmsLocationVO'
+    put:
+      tags:
+        - wms-location
+      summary: 编辑库位
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WmsLocationDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WmsLocationVO'
+    delete:
+      tags:
+        - wms-location
+      summary: 删除库位
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/wms-location:
+    post:
+      tags:
+        - wms-location
+      summary: 新增库位
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WmsLocationDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WmsLocationVO'
+  /admin/wms-stock-doc/list:
+    get:
+      tags:
+        - wms-stock-doc
+      summary: 查询库存单据列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/wms-stock-doc/{id}:
+    get:
+      tags:
+        - wms-stock-doc
+      summary: 查询库存单据详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WmsStockDocVO'
+    put:
+      tags:
+        - wms-stock-doc
+      summary: 编辑库存单据
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WmsStockDocDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WmsStockDocVO'
+    delete:
+      tags:
+        - wms-stock-doc
+      summary: 删除库存单据
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/wms-stock-doc:
+    post:
+      tags:
+        - wms-stock-doc
+      summary: 新增库存单据
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WmsStockDocDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/WmsStockDocVO'
+  /admin/eqm-maintenance/list:
+    get:
+      tags:
+        - eqm-maintenance
+      summary: 查询设备保养列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/eqm-maintenance/{id}:
+    get:
+      tags:
+        - eqm-maintenance
+      summary: 查询设备保养详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/EqmMaintenanceVO'
+    put:
+      tags:
+        - eqm-maintenance
+      summary: 编辑设备保养
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EqmMaintenanceDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/EqmMaintenanceVO'
+    delete:
+      tags:
+        - eqm-maintenance
+      summary: 删除设备保养
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/eqm-maintenance:
+    post:
+      tags:
+        - eqm-maintenance
+      summary: 新增设备保养
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EqmMaintenanceDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/EqmMaintenanceVO'
+  /admin/eqm-repair-order/list:
+    get:
+      tags:
+        - eqm-repair-order
+      summary: 查询设备维修工单列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/eqm-repair-order/{id}:
+    get:
+      tags:
+        - eqm-repair-order
+      summary: 查询设备维修工单详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/EqmRepairOrderVO'
+    put:
+      tags:
+        - eqm-repair-order
+      summary: 编辑设备维修工单
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EqmRepairOrderDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/EqmRepairOrderVO'
+    delete:
+      tags:
+        - eqm-repair-order
+      summary: 删除设备维修工单
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/eqm-repair-order:
+    post:
+      tags:
+        - eqm-repair-order
+      summary: 新增设备维修工单
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EqmRepairOrderDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/EqmRepairOrderVO'
+  /admin/andon-alert/list:
+    get:
+      tags:
+        - andon-alert
+      summary: 查询安灯告警列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/andon-alert/{id}:
+    get:
+      tags:
+        - andon-alert
+      summary: 查询安灯告警详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AndonAlertVO'
+    put:
+      tags:
+        - andon-alert
+      summary: 编辑安灯告警
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AndonAlertDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AndonAlertVO'
+    delete:
+      tags:
+        - andon-alert
+      summary: 删除安灯告警
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/andon-alert:
+    post:
+      tags:
+        - andon-alert
+      summary: 新增安灯告警
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AndonAlertDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AndonAlertVO'
+  /admin/saf-safety-event/list:
+    get:
+      tags:
+        - saf-safety-event
+      summary: 查询安全事件列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/saf-safety-event/{id}:
+    get:
+      tags:
+        - saf-safety-event
+      summary: 查询安全事件详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SafSafetyEventVO'
+    put:
+      tags:
+        - saf-safety-event
+      summary: 编辑安全事件
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SafSafetyEventDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SafSafetyEventVO'
+    delete:
+      tags:
+        - saf-safety-event
+      summary: 删除安全事件
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/saf-safety-event:
+    post:
+      tags:
+        - saf-safety-event
+      summary: 新增安全事件
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SafSafetyEventDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SafSafetyEventVO'
+  /admin/saf-training/list:
+    get:
+      tags:
+        - saf-training
+      summary: 查询安全培训列表（V2.3 分页）
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: 当前页码
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: 每页条数
+
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+  /admin/saf-training/{id}:
+    get:
+      tags:
+        - saf-training
+      summary: 查询安全培训详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SafTrainingVO'
+    put:
+      tags:
+        - saf-training
+      summary: 编辑安全培训
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SafTrainingDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SafTrainingVO'
+    delete:
+      tags:
+        - saf-training
+      summary: 删除安全培训
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/saf-training:
+    post:
+      tags:
+        - saf-training
+      summary: 新增安全培训
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SafTrainingDTO'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SafTrainingVO'
+  /admin/report/work-order:
+    get:
+      tags:
+        - report
+      summary: 查询工单报表
+      description: 按条件查询工单报表明细
+      parameters:
+        - name: startTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 开始时间
+        - name: endTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 结束时间
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 工单状态
+        - name: itemId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 产品物料ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/WorkOrderReportVO'
+  /admin/report/work-order/export:
+    get:
+      tags:
+        - report
+      summary: 导出工单报表（Excel）
+      description: 按条件导出工单报表为 Excel 文件
+      parameters:
+        - name: startTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 开始时间
+        - name: endTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 结束时间
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 工单状态
+        - name: itemId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 产品物料ID
+      responses:
+        '200':
+          description: Excel 文件下载
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /admin/report/inventory:
+    get:
+      tags:
+        - report
+      summary: 查询库存报表
+      description: 按条件查询库存报表明细
+      parameters:
+        - name: itemId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 物料ID
+        - name: locationId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 库位ID
+        - name: itemType
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 物料类型
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/InventoryReportVO'
+  /admin/report/inventory/export:
+    get:
+      tags:
+        - report
+      summary: 导出库存报表（Excel）
+      description: 按条件导出库存报表为 Excel 文件
+      parameters:
+        - name: itemId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 物料ID
+        - name: locationId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 库位ID
+        - name: itemType
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 物料类型
+      responses:
+        '200':
+          description: Excel 文件下载
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /admin/report/quality:
+    get:
+      tags:
+        - report
+      summary: 查询质量报表
+      description: 按条件查询质量报表明细
+      parameters:
+        - name: startTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 开始时间
+        - name: endTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 结束时间
+        - name: result
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 检验结果（PASS/FAIL）
+        - name: workOrderId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 工单ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/QualityReportVO'
+  /admin/report/quality/export:
+    get:
+      tags:
+        - report
+      summary: 导出质量报表（Excel）
+      description: 按条件导出质量报表为 Excel 文件
+      parameters:
+        - name: startTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 开始时间
+        - name: endTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 结束时间
+        - name: result
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 检验结果（PASS/FAIL）
+        - name: workOrderId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 工单ID
+      responses:
+        '200':
+          description: Excel 文件下载
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /admin/report/equipment-repair:
+    get:
+      tags:
+        - report
+      summary: 查询设备维修报表
+      description: 按条件查询设备维修报表明细
+      parameters:
+        - name: startTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 开始时间
+        - name: endTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 结束时间
+        - name: equipmentId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 设备ID
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 状态
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EquipmentRepairReportVO'
+  /admin/report/equipment-repair/export:
+    get:
+      tags:
+        - report
+      summary: 导出设备维修报表（Excel）
+      description: 按条件导出设备维修报表为 Excel 文件
+      parameters:
+        - name: startTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 开始时间
+        - name: endTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 结束时间
+        - name: equipmentId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: 设备ID
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 状态
+      responses:
+        '200':
+          description: Excel 文件下载
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /admin/report/andon:
+    get:
+      tags:
+        - report
+      summary: 查询安灯报表
+      description: 按条件查询安灯报表明细
+      parameters:
+        - name: startTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 开始时间
+        - name: endTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 结束时间
+        - name: alertType
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 告警类型
+        - name: level
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 告警等级
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 状态
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Result'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AndonReportVO'
+  /admin/report/andon/export:
+    get:
+      tags:
+        - report
+      summary: 导出安灯报表（Excel）
+      description: 按条件导出安灯报表为 Excel 文件
+      parameters:
+        - name: startTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 开始时间
+        - name: endTime
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 结束时间
+        - name: alertType
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 告警类型
+        - name: level
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 告警等级
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 状态
+      responses:
+        '200':
+          description: Excel 文件下载
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /admin/message-test/work-order:
+    post:
+      tags:
+        - message-test
+      summary: 测试发送工单消息
+      description: 向 RabbitMQ 发送一条测试工单消息
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/message-test/inventory:
+    post:
+      tags:
+        - message-test
+      summary: 测试发送库存消息
+      description: 向 RabbitMQ 发送一条测试库存消息
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/message-test/quality:
+    post:
+      tags:
+        - message-test
+      summary: 测试发送质量消息
+      description: 向 RabbitMQ 发送一条测试质量消息
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/message-test/equipment:
+    post:
+      tags:
+        - message-test
+      summary: 测试发送设备消息
+      description: 向 RabbitMQ 发送一条测试设备消息
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+  /admin/message-test/andon:
+    post:
+      tags:
+        - message-test
+      summary: 测试发送安灯消息
+      description: 向 RabbitMQ 发送一条测试安灯消息
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+
+
+  # ==================== V3.4 状态流转日志 ====================
+
+  /admin/status-transition-log/{entityType}/{entityId}:
+    get:
+      tags: [pro-work-order]
+      summary: 查询状态流转日志 (V3.4)
+      parameters:
+        - name: entityType
+          in: path
+          required: true
+          schema: { type: string, enum: [WORK_ORDER, WORK_PROCESS] }
+        - name: entityId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: 状态流转日志列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    logId: { type: integer, format: int64 }
+                    entityType: { type: string }
+                    entityId: { type: integer, format: int64 }
+                    fromStatus: { type: string }
+                    toStatus: { type: string }
+                    action: { type: string }
+                    operatorUserId: { type: integer, format: int64 }
+                    operatorName: { type: string }
+                    requestId: { type: string }
+                    remark: { type: string }
+                    transitionTime: { type: string, format: date-time }

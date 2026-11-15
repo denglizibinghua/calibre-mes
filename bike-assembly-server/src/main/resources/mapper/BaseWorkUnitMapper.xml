@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bikeassembly.mapper.BaseWorkUnitMapper">
+
+    <!-- 基础 CRUD 已由 MyBatis-Plus BaseMapper 提供，此处只写自定义查询 -->
+
+    <select id="countReferences" resultType="int">
+        SELECT COUNT(*) FROM (
+            SELECT 1 FROM base_equipment WHERE unit_id = #{unitId}
+            UNION ALL
+            SELECT 1 FROM pro_work_order WHERE work_unit_id = #{unitId}
+            UNION ALL
+            SELECT 1 FROM andon_alert WHERE unit_id = #{unitId}
+        ) t
+    </select>
+
+    <select id="selectDescendantUnitIds" resultType="long">
+        WITH RECURSIVE unit_tree AS (
+            SELECT unit_id, parent_id
+            FROM base_work_unit
+            WHERE unit_id = #{rootUnitId} AND status = '0'
+            UNION ALL
+            SELECT child.unit_id, child.parent_id
+            FROM base_work_unit child
+            JOIN unit_tree parent ON child.parent_id = parent.unit_id
+            WHERE child.status = '0'
+        )
+        SELECT unit_id FROM unit_tree
+    </select>
+
+</mapper>

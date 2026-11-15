@@ -1,0 +1,37 @@
+{
+  "synthetic": true,
+  "generatedBy": "scripts/data/generate-demo-data.cjs",
+  "checks": 41,
+  "counts": {
+    "base_item": 31,
+    "base_work_unit": 12,
+    "base_process": 8,
+    "base_bom": 3,
+    "base_route": 3,
+    "base_equipment": 20,
+    "qms_inspection_item": 6,
+    "pro_work_order": 48,
+    "pro_status_transition_log": 1738,
+    "pro_work_process": 368,
+    "qms_inspection": 121,
+    "qms_defect": 8,
+    "eqm_repair_order": 4,
+    "eqm_maintenance": 5,
+    "andon_alert": 11,
+    "wms_location": 11,
+    "wms_stock_doc": 165,
+    "wms_inventory": 120,
+    "wms_stock_flow": 1828,
+    "saf_safety_event": 4,
+    "saf_training": 3
+  },
+  "preservedTables": [
+    "sys_user",
+    "sys_role",
+    "sys_menu",
+    "sys_role_menu",
+    "sys_config",
+    "sys_user_password_history",
+    "user_refresh_token"
+  ]
+}
