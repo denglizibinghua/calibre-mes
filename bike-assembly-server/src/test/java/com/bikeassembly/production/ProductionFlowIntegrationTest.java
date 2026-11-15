@@ -1,6 +1,7 @@
 package com.bikeassembly.production;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.bikeassembly.AbstractPostgresContainerIntegrationTest;
 import com.bikeassembly.context.BaseContext;
 import com.bikeassembly.dto.ProWorkOrderDTO;
 import com.bikeassembly.entity.ProWorkOrder;
@@ -33,17 +34,21 @@ import static org.junit.jupiter.api.Assertions.*;
  * 生产流程完整集成测试。
  * 覆盖：工单创建→指派→下达→工序生成→开始→报工→质检→返工→完工→关闭
  *
- * 使用本地 MySQL 数据库，每次测试独立创建工单。
+ * 使用容器化 PostgreSQL 16 数据库，每次测试独立创建工单。
  *
  * 执行命令：
  *   mvn test -pl bike-assembly-server -Dtest=ProductionFlowIntegrationTest
- *   （确保先执行 sql/test/seed_production_flow.sql）
  */
 @SpringBootTest
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("生产流程完整集成测试")
-public class ProductionFlowIntegrationTest {
+public class ProductionFlowIntegrationTest extends AbstractPostgresContainerIntegrationTest {
+
+    @BeforeAll
+    static void seedProductionFlow() {
+        executeSql("sql/test/seed_production_flow.sql");
+    }
 
     private static final Long ADMIN_USER_ID = 1L;
     private static final Long OPERATOR_USER_ID = 1002L;

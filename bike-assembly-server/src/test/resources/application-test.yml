@@ -1,4 +1,4 @@
-# 测试环境配置：禁用 RabbitMQ + 开发数据库 + 自动初始化认证安全 Schema
+# 测试环境配置：禁用 RabbitMQ + PostgreSQL 数据源（集成测试由 Testcontainers 动态覆盖）+ 固定测试密钥
 app:
   rabbitmq:
     enabled: false
@@ -8,10 +8,10 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/bike_assembly_mes?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false&allowMultiQueries=true
-    username: ${MYSQL_USERNAME:root}
-    password: ${MYSQL_PASSWORD:123456}
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:bike_assembly_mes}
+    username: ${DB_USERNAME:mes}
+    password: ${DB_PASSWORD:mes123456}
   sql:
     init:
       mode: never
@@ -22,6 +22,11 @@ bike:
       secret-key: test-admin-secret-for-integration-tests-only
     app:
       secret-key: test-app-secret-for-integration-tests-only
+
+# 集成测试关注业务语义，请求限流由 AntiCrawlerMergeCompatibilityTest 单测覆盖
+security:
+  anti-crawler:
+    enabled: false
 
 wechat:
   miniapp:

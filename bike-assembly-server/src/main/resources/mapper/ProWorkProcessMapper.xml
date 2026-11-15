@@ -56,14 +56,15 @@
         2. report_qty = report_qty + #{reportQty}：在数据库层面原子累加（不使用 Java 先读后写）
         3. (report_qty + #{reportQty}) &lt;= plan_qty：防止报工数量超计划
       如果 WHERE 条件不满足（版本冲突或超量），影响行数为 0，Java 层抛 StateMachineException
-      [数据库操作] 同时更新 pro_work_process 和 JOIN pro_work_order 做校验
+      [数据库操作] 同时更新 pro_work_process，并通过 FROM pro_work_order 关联做校验
     -->
     <update id="accumulateReportQty">
         UPDATE pro_work_process pp
-        INNER JOIN pro_work_order wo ON wo.work_order_id = pp.work_order_id
-        SET pp.report_qty = pp.report_qty + #{reportQty},
-            pp.version    = pp.version + 1
-        WHERE pp.process_record_id = #{processRecordId}
+        SET report_qty = pp.report_qty + #{reportQty},
+            version    = pp.version + 1
+        FROM pro_work_order wo
+        WHERE wo.work_order_id = pp.work_order_id
+          AND pp.process_record_id = #{processRecordId}
           AND pp.status = '1'
           AND pp.version = #{version}
           AND (pp.report_qty + #{reportQty}) &lt;= wo.plan_qty

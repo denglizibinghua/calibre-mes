@@ -19,7 +19,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import javax.sql.DataSource;
 
 /**
- * PGVector 使用独立 PostgreSQL 数据源，避免把 MySQL MES 数据源误传给向量库。
+ * PGVector 使用独立 PostgreSQL 数据源（ai.pgvector.*, database mes_ai），
+ * 避免把 MES 关系数据源（database bike_assembly_mes）误传给向量库。
  * Spring AI 自带的 PGVector 自动配置被排除，确保该配置只在显式开关打开时生效。
  */
 @Configuration

@@ -1,5 +1,6 @@
 package com.bikeassembly.review;
 
+import com.bikeassembly.AbstractPostgresContainerIntegrationTest;
 import com.bikeassembly.dto.WxBindDTO;
 import com.bikeassembly.dto.WxLoginDTO;
 import com.bikeassembly.entity.SysUser;
@@ -18,11 +19,11 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
-/** 在现有本地MySQL上执行实际Mapper绑定；测试事务结束全部回滚，不留下测试账号。 */
+/** 在容器化 PostgreSQL 上执行实际Mapper绑定；测试事务结束全部回滚，不留下测试账号。 */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("dev")
+@ActiveProfiles("test")
 @Transactional
-class WechatBindingDatabaseTest {
+class WechatBindingDatabaseTest extends AbstractPostgresContainerIntegrationTest {
     @Autowired private SysUserService service;
     @Autowired private SysUserMapper users;
     @MockBean private WechatService wechat;

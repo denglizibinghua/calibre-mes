@@ -85,6 +85,7 @@ import {
 } from '@/api/auth'
 import { updateActiveTab } from '@/stores/tabBar'
 import TabBar from '@/components/tab-bar/index.vue'
+import { captureFaceImage } from '@/utils/faceCapture'
 
 const userStore = useUserStore()
 const faceRegistered = ref(false)
@@ -187,28 +188,6 @@ function confirmFaceConsent(content: string): Promise<boolean> {
       cancelText: '取消',
       success: (result) => resolve(result.confirm),
       fail: () => resolve(false),
-    })
-  })
-}
-
-function captureFaceImage(): Promise<string | null> {
-  return new Promise((resolve) => {
-    uni.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['camera'],
-      camera: 'front',
-      success: (result) => {
-        const file = result.tempFiles?.[0]
-        if (!file?.tempFilePath) return resolve(null)
-        uni.getFileSystemManager().readFile({
-          filePath: file.tempFilePath,
-          encoding: 'base64',
-          success: (readResult) => resolve(String(readResult.data)),
-          fail: () => resolve(null),
-        })
-      },
-      fail: () => resolve(null),
     })
   })
 }

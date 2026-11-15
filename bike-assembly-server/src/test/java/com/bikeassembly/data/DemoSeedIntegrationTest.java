@@ -2,12 +2,14 @@ package com.bikeassembly.data;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.bikeassembly.TestcontainersSupport;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
-import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.utility.MountableFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -15,12 +17,12 @@ import java.sql.*;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Validates the actual initialization/reset SQL against isolated MySQL, never a business schema. */
+/** Validates the actual initialization/reset SQL against isolated PostgreSQL 16, never a business schema. */
 class DemoSeedIntegrationTest {
     static final String SCHEMA="mes_seed_test_"+UUID.randomUUID().toString().replace("-","");
     static final List<String> PRESERVED=List.of("sys_user","sys_role","sys_menu","sys_role_menu","sys_config","sys_user_password_history","user_refresh_token");
-    static MySQLContainer<?> mysql;
-    static String adminUrl,url,user,password;
+    static PostgreSQLContainer<?> postgres;
+    static String url,user,password;
     static Connection connection;
     static Path root;
     static Map<String,String> identitySnapshot;
@@ -28,45 +30,41 @@ class DemoSeedIntegrationTest {
     @BeforeAll
     static void initializeDatabase() throws Exception {
         root=Path.of("..").toAbsolutePath().normalize();
-        adminUrl=System.getenv("MES_REVIEW_MYSQL_URL");
-        if(adminUrl==null||adminUrl.isBlank()) {
-            mysql=new MySQLContainer<>("mysql:8.0").withDatabaseName(SCHEMA);mysql.start();
-            url=mysql.getJdbcUrl();user=mysql.getUsername();password=mysql.getPassword();
-        } else {
-            if(!adminUrl.matches("jdbc:mysql://[^/]+/")) throw new IllegalArgumentException("Use a server URL without a database name");
-            user=System.getenv().getOrDefault("MES_REVIEW_MYSQL_USER","root");
-            password=System.getenv().getOrDefault("MES_REVIEW_MYSQL_PASSWORD","");
-            try(Connection admin=DriverManager.getConnection(adminUrl,user,password)) {
-                admin.createStatement().execute("CREATE DATABASE `"+SCHEMA+"` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-            }
-            url=adminUrl+SCHEMA+"?serverTimezone=Asia/Shanghai&connectTimeout=5000&socketTimeout=60000";
-        }
+        TestcontainersSupport.configureDockerApiVersion();
+        postgres=new PostgreSQLContainer<>("postgres:16-alpine").withDatabaseName(SCHEMA);
+        postgres.start();
+        url=postgres.getJdbcUrl();user=postgres.getUsername();password=postgres.getPassword();
+        executeInitScript();
         connection=DriverManager.getConnection(url,user,password);
         assertEquals(SCHEMA,connection.getCatalog());
-        script("init_database.sql");
         // Existing deployments need not use the IDs/nicknames from the original init script.
-        connection.createStatement().executeUpdate("UPDATE sys_user SET user_id=user_id+100,nickname=CONCAT(nickname,'（保留验证）') WHERE username IN ('planner','operator01','inspector01','maintainer01')");
+        connection.createStatement().executeUpdate("UPDATE sys_user SET user_id=user_id+100,nickname=nickname||'（保留验证）' WHERE username IN ('planner','operator01','inspector01','maintainer01')");
         identitySnapshot=fingerprints();
     }
 
     @BeforeEach
-    void resetFixtures() throws Exception { script("dev_seed_full.sql");assertEquals(identitySnapshot,fingerprints()); }
+    void resetFixtures() throws Exception { resetDemoSeed();assertEquals(identitySnapshot,fingerprints()); }
 
     @AfterAll
     static void cleanup() throws Exception {
         if(connection!=null) connection.close();
-        if(mysql!=null) mysql.stop();
-        else if(url!=null&&SCHEMA.matches("mes_seed_test_[a-f0-9]{32}")) {
-            try(Connection admin=DriverManager.getConnection(adminUrl,user,password)) {
-                admin.createStatement().execute("DROP DATABASE `"+SCHEMA+"`");
-            }
+        if(postgres!=null) postgres.stop();
+    }
+
+    /** init_database.sql contains a plpgsql function body, so execute it with psql inside the container. */
+    static void executeInitScript() throws Exception {
+        Path init=root.resolve("sql/init_database.sql");
+        postgres.copyFileToContainer(MountableFile.forHostPath(init),"/tmp/init_database.sql");
+        var result=postgres.execInContainer("psql","-v","ON_ERROR_STOP=1","-U",user,"-d",SCHEMA,"-f","/tmp/init_database.sql");
+        if(result.getExitCode()!=0) {
+            throw new IllegalStateException("init_database.sql failed (exit "+result.getExitCode()+"): "+result.getStderr());
         }
     }
 
     @Test
     void generatedCountsAndRelationshipsMatchManifest() throws Exception {
         verifyCounts();
-        // A fresh JDBC/mysql session may have a different default connection collation.
+        // A fresh JDBC connection must see the same schema regardless of connection settings.
         try(Connection fresh=DriverManager.getConnection(url,user,password)) {
             ScriptUtils.executeSqlScript(fresh,new FileSystemResource(root.resolve("sql/verify_database.sql")));
         }
@@ -75,7 +73,7 @@ class DemoSeedIntegrationTest {
     @Test
     void repeatedResetRemovesOldRecordsAndPreservesIdentityTables() throws Exception {
         connection.createStatement().executeUpdate("INSERT INTO base_item(item_id,item_code,item_name,item_type,unit,status) VALUES (999,'OLD-FIXTURE','待清理记录','M','件','0')");
-        script("dev_seed_full.sql");verifyCounts();
+        resetDemoSeed();verifyCounts();
         assertEquals(identitySnapshot,fingerprints());
     }
 
@@ -96,12 +94,26 @@ class DemoSeedIntegrationTest {
 
     static void script(String name) {ScriptUtils.executeSqlScript(connection,new FileSystemResource(root.resolve("sql").resolve(name)));}
 
+    /**
+     * dev_seed_full.sql contains a plpgsql DO $$ ... $$ guard, which Spring's ScriptUtils cannot split.
+     * Run it with psql inside the disposable container instead.
+     */
+    static void resetDemoSeed() throws Exception {
+        Path seed = root.resolve("sql/dev_seed_full.sql");
+        postgres.copyFileToContainer(MountableFile.forHostPath(seed), "/tmp/dev_seed_full.sql");
+        var result = postgres.execInContainer("psql", "-v", "ON_ERROR_STOP=1",
+                "-U", user, "-d", SCHEMA, "-f", "/tmp/dev_seed_full.sql");
+        if (result.getExitCode() != 0) {
+            throw new IllegalStateException("dev_seed_full.sql failed (exit " + result.getExitCode() + "): " + result.getStderr());
+        }
+    }
+
     static void verifyCounts() throws Exception {
         JsonNode manifest=new ObjectMapper().readTree(root.resolve("sql/demo-seed-manifest.json").toFile());
         var entries=manifest.get("counts").fields();
         while(entries.hasNext()) {
             var entry=entries.next();
-            try(ResultSet rows=connection.createStatement().executeQuery("SELECT COUNT(*) FROM `"+entry.getKey()+"`")) {
+            try(ResultSet rows=connection.createStatement().executeQuery("SELECT COUNT(*) FROM "+entry.getKey())) {
                 rows.next();assertEquals(entry.getValue().asLong(),rows.getLong(1),entry.getKey());
             }
         }
@@ -111,7 +123,7 @@ class DemoSeedIntegrationTest {
         Map<String,String> output=new LinkedHashMap<>();
         for(String table:PRESERVED) {
             List<String> values=new ArrayList<>();
-            try(ResultSet rows=connection.createStatement().executeQuery("SELECT * FROM `"+table+"`")) {
+            try(ResultSet rows=connection.createStatement().executeQuery("SELECT * FROM "+table)) {
                 while(rows.next()) {
                     StringBuilder row=new StringBuilder();
                     for(int i=1;i<=rows.getMetaData().getColumnCount();i++) {

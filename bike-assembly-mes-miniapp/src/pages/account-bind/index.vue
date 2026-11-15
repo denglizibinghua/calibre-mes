@@ -128,6 +128,7 @@ function handleBackToLogin(): void {
 .bind-icon-wrap {
   width: 100rpx;
   height: 100rpx;
+  border: 1rpx solid var(--lux-line);
   border-radius: var(--lux-radius-sm);
   background: var(--lux-jade-50);
   display: flex;
@@ -144,6 +145,7 @@ function handleBackToLogin(): void {
 .bind-title {
   font-size: 36rpx;
   font-weight: 600;
+  letter-spacing: 1rpx;
   color: var(--lux-ink-900);
 }
 
@@ -179,17 +181,18 @@ function handleBackToLogin(): void {
 .tab-item--active {
   background: var(--lux-surface);
   color: var(--lux-gold-600);
-  font-weight: 600;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
+  font-weight: 500;
+  box-shadow: 0 2rpx 6rpx rgba(35, 28, 15, .06);
 }
 
 /* ========== 表单卡片 ========== */
 .bind-form {
   width: 100%;
   background: var(--lux-surface);
+  border: 1rpx solid var(--lux-line);
   border-radius: var(--lux-radius-md);
   padding: 40rpx 36rpx;
-  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.04);
+  box-shadow: var(--lux-shadow-card);
 }
 
 .form-item {
@@ -199,7 +202,7 @@ function handleBackToLogin(): void {
 .form-label {
   display: block;
   font-size: 28rpx;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--lux-ink-900);
   margin-bottom: 14rpx;
 }
@@ -287,8 +290,9 @@ function handleBackToLogin(): void {
   color: #17130B;
   font-size: 30rpx;
   font-weight: 600;
+  letter-spacing: 1rpx;
   border-radius: var(--lux-radius-sm);
-  border: none;
+  border: 1rpx solid var(--lux-gold-600);
   margin-top: 16rpx;
 }
 

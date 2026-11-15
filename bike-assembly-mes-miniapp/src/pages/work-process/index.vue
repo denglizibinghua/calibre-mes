@@ -189,7 +189,7 @@
               v-model="completeForm.reportQty"
               type="digit"
               placeholder="请输入报工数量"
-              placeholder-style="color: #a7b1c2"
+              placeholder-style="color: #6F6A5F"
             />
           </view>
         </view>
@@ -504,6 +504,7 @@ async function submitComplete(): Promise<void> {
   display: flex;
   background: var(--lux-surface);
   padding: 24rpx 28rpx;
+  border-bottom: 1rpx solid var(--lux-line-soft);
   justify-content: space-around;
   margin-bottom: 0;
 }
@@ -517,6 +518,8 @@ async function submitComplete(): Promise<void> {
 .summary-num {
   font-size: 40rpx;
   font-weight: 500;
+  font-family: var(--lux-font-data);
+  font-variant-numeric: tabular-nums;
   color: var(--lux-ink-900);
 }
 
@@ -636,6 +639,7 @@ async function submitComplete(): Promise<void> {
   padding: 28rpx;
   margin-bottom: 16rpx;
   border: 1rpx solid var(--lux-line);
+  box-shadow: var(--lux-shadow-card);
 }
 
 .card-header {
@@ -653,6 +657,7 @@ async function submitComplete(): Promise<void> {
 .process-name {
   font-size: 30rpx;
   font-weight: 600;
+  letter-spacing: 1rpx;
   color: var(--lux-ink-900);
 }
 
@@ -666,7 +671,7 @@ async function submitComplete(): Promise<void> {
 .status-tag {
   font-size: 22rpx;
   padding: 6rpx 14rpx;
-  border-radius: 8rpx;
+  border-radius: var(--lux-radius-xs);
   font-weight: 500;
   flex-shrink: 0;
 }
@@ -730,11 +735,13 @@ async function submitComplete(): Promise<void> {
 }
 
 .action-btn--start {
+  border: 1rpx solid var(--lux-gold-600);
   color: #17130B;
   background: var(--lux-gold-gradient);
 }
 
 .action-btn--complete {
+  border: 1rpx solid var(--lux-jade);
   color: var(--lux-porcelain-50);
   background: var(--lux-jade);
 }
@@ -752,7 +759,7 @@ async function submitComplete(): Promise<void> {
   padding: 20rpx 28rpx;
   padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
   background: var(--lux-surface);
-  box-shadow: 0 -2rpx 12rpx rgba(0, 0, 0, 0.04);
+  box-shadow: var(--lux-shadow-bar);
 }
 
 .create-btn {
@@ -763,8 +770,9 @@ async function submitComplete(): Promise<void> {
   color: #17130B;
   font-size: 30rpx;
   font-weight: 600;
+  letter-spacing: 1rpx;
   border-radius: var(--lux-radius-sm);
-  border: none;
+  border: 1rpx solid var(--lux-gold-600);
 }
 
 .create-btn:active { opacity: 0.85; }
@@ -776,7 +784,7 @@ async function submitComplete(): Promise<void> {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(7, 10, 15, 0.58);
   display: flex;
   align-items: flex-end;
   z-index: 100;
@@ -802,6 +810,7 @@ async function submitComplete(): Promise<void> {
 .modal-title {
   font-size: 32rpx;
   font-weight: 600;
+  letter-spacing: 1rpx;
   color: var(--lux-ink-900);
 }
 
@@ -844,6 +853,7 @@ async function submitComplete(): Promise<void> {
 }
 
 .modal-btn--confirm {
+  border: 1rpx solid var(--lux-gold-600);
   background: var(--lux-gold-gradient);
   color: #17130B;
 }
@@ -860,7 +870,7 @@ async function submitComplete(): Promise<void> {
 .form-label {
   display: block;
   font-size: 28rpx;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--lux-ink-900);
   margin-bottom: 14rpx;
 }
@@ -920,6 +930,6 @@ async function submitComplete(): Promise<void> {
   color: var(--lux-gold-600);
   background: var(--lux-gold-50);
   border-color: var(--lux-gold-600);
-  font-weight: 600;
+  font-weight: 500;
 }
 </style>

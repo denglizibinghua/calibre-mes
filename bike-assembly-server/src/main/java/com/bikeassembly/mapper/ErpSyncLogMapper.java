@@ -15,12 +15,12 @@ public interface ErpSyncLogMapper extends BaseMapper<ErpSyncLog> {
      */
     @Insert("INSERT INTO erp_sync_log " +
             "(biz_type, biz_id, sync_direction, sync_status, request_data, response_data, sync_time) " +
-            "VALUES (#{bizType}, #{bizId}, #{syncDirection}, #{syncStatus}, #{requestData}, #{responseData}, NOW()) " +
-            "ON DUPLICATE KEY UPDATE " +
-            "sync_status = VALUES(sync_status), " +
-            "request_data = VALUES(request_data), " +
-            "response_data = VALUES(response_data), " +
-            "sync_time = NOW()")
+            "VALUES (#{bizType}, #{bizId}, #{syncDirection}, #{syncStatus}, #{requestData}, #{responseData}, CURRENT_TIMESTAMP) " +
+            "ON CONFLICT (biz_type, biz_id, sync_direction) DO UPDATE SET " +
+            "sync_status = EXCLUDED.sync_status, " +
+            "request_data = EXCLUDED.request_data, " +
+            "response_data = EXCLUDED.response_data, " +
+            "sync_time = CURRENT_TIMESTAMP")
     int upsertByBiz(@Param("bizType") String bizType,
                     @Param("bizId") String bizId,
                     @Param("syncDirection") String syncDirection,

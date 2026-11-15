@@ -15,15 +15,16 @@ jobs:
     name: Backend (mvn test)
     runs-on: ubuntu-24.04
     services:
-      mysql:
-        image: mysql:8.0
+      postgres:
+        image: postgres:16
         env:
-          MYSQL_ROOT_PASSWORD: '123456'
-          MYSQL_DATABASE: bike_assembly_mes
+          POSTGRES_DB: bike_assembly_mes
+          POSTGRES_USER: mes
+          POSTGRES_PASSWORD: 'mes123456'
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -p123456"
+          --health-cmd "pg_isready -U mes -d bike_assembly_mes"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 12
@@ -39,10 +40,11 @@ jobs:
       - name: Init test database
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends mysql-client
-          mysql -h127.0.0.1 -uroot -p123456 bike_assembly_mes < sql/init_database.sql
-          mysql -h127.0.0.1 -uroot -p123456 bike_assembly_mes < sql/dev_seed_full.sql
-          mysql -h127.0.0.1 -uroot -p123456 bike_assembly_mes < sql/test/seed_production_flow.sql
+          sudo apt-get install -y --no-install-recommends postgresql-client
+          export PGPASSWORD=mes123456
+          psql -h 127.0.0.1 -U mes -d bike_assembly_mes -v ON_ERROR_STOP=1 -f sql/init_database.sql
+          psql -h 127.0.0.1 -U mes -d bike_assembly_mes -v ON_ERROR_STOP=1 -f sql/dev_seed_full.sql
+          psql -h 127.0.0.1 -U mes -d bike_assembly_mes -v ON_ERROR_STOP=1 -f sql/test/seed_production_flow.sql
 
       - name: Run backend tests
         # 固定 API 版本兼容新版 Docker（Testcontainers 1.20.4 默认 1.32，Docker>=29 最低 1.40）

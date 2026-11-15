@@ -10,10 +10,10 @@ public interface UserFaceTemplateMapper extends BaseMapper<UserFaceTemplate> {
     @Insert("""
             INSERT INTO user_face_template (user_id, embedding_ciphertext, consented_at, updated_at)
             VALUES (#{userId}, #{embeddingCiphertext}, #{consentedAt}, #{updatedAt})
-            ON DUPLICATE KEY UPDATE
-              embedding_ciphertext = VALUES(embedding_ciphertext),
-              consented_at = VALUES(consented_at),
-              updated_at = VALUES(updated_at)
+            ON CONFLICT (user_id) DO UPDATE SET
+              embedding_ciphertext = EXCLUDED.embedding_ciphertext,
+              consented_at = EXCLUDED.consented_at,
+              updated_at = EXCLUDED.updated_at
             """)
     int upsertTemplate(UserFaceTemplate template);
 }

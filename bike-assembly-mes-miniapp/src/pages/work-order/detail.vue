@@ -315,6 +315,7 @@ function goBack(): void {
   border-radius: var(--lux-radius-md);
   padding: 28rpx;
   border: 1rpx solid var(--lux-line);
+  box-shadow: var(--lux-shadow-card);
 }
 
 .section-header {
@@ -328,7 +329,8 @@ function goBack(): void {
 
 .section-title {
   font-size: 30rpx;
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: 1rpx;
   color: var(--lux-ink-900);
 }
 
@@ -341,7 +343,7 @@ function goBack(): void {
 .status-tag {
   font-size: 22rpx;
   padding: 6rpx 14rpx;
-  border-radius: 8rpx;
+  border-radius: var(--lux-radius-xs);
   font-weight: 500;
 }
 
@@ -459,18 +461,18 @@ function goBack(): void {
   height: 16rpx;
   border-radius: 50%;
   margin-right: 12rpx;
-  background: #a7b1c2;
+  background: var(--lux-text-faint);
 }
 
-.step-dot--0 { background: #a7b1c2; }
+.step-dot--0 { background: var(--lux-text-faint); }
 .step-dot--1 { background: var(--lux-gold-600); }
 .step-dot--2 { background: var(--lux-jade); }
 .step-dot--3 { background: var(--lux-ember); }
 .step-dot--4 { background: var(--lux-jade); }
 .step-dot--5 { background: var(--lux-wine); }
 .step-dot--6 { background: var(--lux-ember); }
-.step-dot--7 { background: #7b8aa0; }
-.step-dot--8 { background: #7b8aa0; }
+.step-dot--7 { background: var(--lux-text-faint); }
+.step-dot--8 { background: var(--lux-text-faint); }
 .step-dot--9 { background: var(--lux-gold-600); }
 
 .step-name {

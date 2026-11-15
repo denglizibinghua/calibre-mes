@@ -1,6 +1,6 @@
 package com.bikeassembly.security;
 
-import com.bikeassembly.AbstractMySqlContainerIntegrationTest;
+import com.bikeassembly.AbstractPostgresContainerIntegrationTest;
 import com.bikeassembly.entity.UserRefreshToken;
 import com.bikeassembly.mapper.SysUserMapper;
 import com.bikeassembly.mapper.UserRefreshTokenMapper;
@@ -24,14 +24,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * HTTP + 数据库集成测试：双 Token 认证、刷新、撤销、通道隔离、强制改密。
- * 使用 Testcontainers MySQL 8 + init_database.sql 提供 Schema 和种子数据。
+ * 使用 Testcontainers PostgreSQL 16 + init_database.sql 提供 Schema 和种子数据。
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("认证安全集成测试 (HTTP + DB)")
-class AuthenticationIntegrationTest extends AbstractMySqlContainerIntegrationTest {
+class AuthenticationIntegrationTest extends AbstractPostgresContainerIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;

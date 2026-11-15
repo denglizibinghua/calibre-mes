@@ -126,7 +126,7 @@
               class="form-textarea"
               v-model="createForm.faultDesc"
               placeholder="请描述设备故障情况"
-              placeholder-style="color: #a7b1c2"
+              placeholder-style="color: #6F6A5F"
               :maxlength="255"
             />
           </view>
@@ -154,7 +154,7 @@
               class="form-textarea"
               v-model="completeForm.resultDesc"
               placeholder="请填写维修结果/处理说明"
-              placeholder-style="color: #a7b1c2"
+              placeholder-style="color: #6F6A5F"
               :maxlength="255"
             />
           </view>
@@ -420,18 +420,18 @@ async function submitComplete(): Promise<void> {
 .repair-page { min-height: 100vh; padding: 0 24rpx 140rpx; background: var(--lux-porcelain-100); }
 .filter-bar { padding: 20rpx 0 4rpx; }
 .filter-scroll { white-space: nowrap; }
-.filter-tag { display: inline-block; padding: 12rpx 30rpx; margin-right: 16rpx; border-radius: var(--lux-radius-xs); background: var(--lux-surface); color: var(--lux-text-faint); font-size: 25rpx; }
+.filter-tag { display: inline-block; padding: 12rpx 30rpx; margin-right: 16rpx; border: 1rpx solid var(--lux-line); border-radius: var(--lux-radius-xs); background: var(--lux-surface); color: var(--lux-text); font-size: 25rpx; }
 .filter-tag--active { background: var(--lux-ink-900); color: var(--lux-porcelain-50); }
 .state-box { display: flex; flex-direction: column; align-items: center; padding: 140rpx 40rpx; }
 .state-text { color: var(--lux-text-faint); font-size: 26rpx; }
 .state-text--error { color: var(--lux-wine); }
-.state-retry-btn { margin-top: 24rpx; padding: 14rpx 40rpx; border-radius: var(--lux-radius-xs); background: var(--lux-gold-50); }
+.state-retry-btn { margin-top: 24rpx; padding: 14rpx 40rpx; border: 1rpx solid var(--lux-gold-600); border-radius: var(--lux-radius-sm); background: var(--lux-surface); }
 .retry-text { color: var(--lux-gold-700); font-size: 25rpx; }
 .empty-img { width: 120rpx; height: 120rpx; opacity: .8; }
-.empty-title { margin-top: 20rpx; color: var(--lux-ink-900); font-size: 30rpx; font-weight: 600; }
+.empty-title { margin-top: 20rpx; color: var(--lux-ink-900); font-size: 30rpx; font-weight: 500; letter-spacing: 1rpx; }
 .empty-desc { margin-top: 10rpx; color: var(--lux-text-faint); font-size: 24rpx; }
 .repair-list { padding: 8rpx 0 20rpx; }
-.repair-card { margin-top: 20rpx; padding: 26rpx 26rpx 10rpx; border: 1rpx solid var(--lux-line); border-radius: var(--lux-radius-md); background: var(--lux-surface); }
+.repair-card { margin-top: 20rpx; padding: 26rpx 26rpx 10rpx; border: 1rpx solid var(--lux-line); border-radius: var(--lux-radius-md); background: var(--lux-surface); box-shadow: var(--lux-shadow-card); }
 .card-header { display: flex; align-items: flex-start; justify-content: space-between; }
 .header-left { display: flex; flex: 1; flex-direction: column; min-width: 0; }
 .equip-name { color: var(--lux-ink-900); font-size: 29rpx; font-weight: 500; }
@@ -449,16 +449,16 @@ async function submitComplete(): Promise<void> {
 .card-actions { display: flex; justify-content: flex-end; gap: 16rpx; padding: 16rpx 0 6rpx; border-top: 1rpx solid var(--lux-line-soft); }
 .action-btn { flex: 1; max-width: 220rpx; margin: 0; padding: 0; height: 64rpx; line-height: 64rpx; border-radius: var(--lux-radius-sm); font-size: 26rpx; }
 .action-btn::after { border: none; }
-.action-btn--accept { background: var(--lux-gold-gradient); color: #17130B; }
-.action-btn--complete { background: var(--lux-jade-50); color: var(--lux-jade-600); }
+.action-btn--accept { border: 1rpx solid var(--lux-gold-600); background: var(--lux-gold-gradient); color: #17130B; }
+.action-btn--complete { border: 1rpx solid var(--lux-jade-line); background: var(--lux-jade-50); color: var(--lux-jade-600); }
 .bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom)); background: var(--lux-surface); box-shadow: var(--lux-shadow-bar); }
-.create-btn { height: 88rpx; line-height: 88rpx; border-radius: var(--lux-radius-sm); background: var(--lux-gold-gradient); color: #17130B; font-size: 30rpx; font-weight: 600; }
+.create-btn { height: 88rpx; line-height: 88rpx; border: 1rpx solid var(--lux-gold-600); border-radius: var(--lux-radius-sm); background: var(--lux-gold-gradient); color: #17130B; font-size: 30rpx; font-weight: 600; letter-spacing: 1rpx; }
 .create-btn::after { border: none; }
 .bottom-placeholder { height: 20rpx; }
-.modal-mask { position: fixed; inset: 0; z-index: 100; display: flex; align-items: flex-end; background: rgba(15, 23, 42, .45); }
+.modal-mask { position: fixed; inset: 0; z-index: 100; display: flex; align-items: flex-end; background: rgba(7, 10, 15, .58); }
 .modal-panel { width: 100%; padding: 30rpx 30rpx calc(30rpx + env(safe-area-inset-bottom)); border-radius: var(--lux-radius-md) var(--lux-radius-md) 0 0; background: var(--lux-surface); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 20rpx; }
-.modal-title { color: var(--lux-ink-900); font-size: 32rpx; font-weight: 600; }
+.modal-title { color: var(--lux-ink-900); font-size: 32rpx; font-weight: 600; letter-spacing: 1rpx; }
 .modal-close { color: var(--lux-text-faint); font-size: 34rpx; padding: 0 10rpx; }
 .modal-body { max-height: 62vh; overflow-y: auto; }
 .form-item { margin-top: 24rpx; }
@@ -471,7 +471,7 @@ async function submitComplete(): Promise<void> {
 .modal-footer { display: flex; gap: 20rpx; margin-top: 36rpx; }
 .modal-btn { flex: 1; height: 84rpx; line-height: 84rpx; border-radius: var(--lux-radius-sm); font-size: 28rpx; margin: 0; }
 .modal-btn::after { border: none; }
-.modal-btn--cancel { background: var(--lux-porcelain-200); color: var(--lux-text-faint); }
-.modal-btn--confirm { background: var(--lux-gold-gradient); color: #17130B; }
-.modal-btn--confirm[disabled] { background: var(--lux-porcelain-200); color: #17130B; }
+.modal-btn--cancel { background: var(--lux-porcelain-200); color: var(--lux-text); }
+.modal-btn--confirm { border: 1rpx solid var(--lux-gold-600); background: var(--lux-gold-gradient); color: #17130B; }
+.modal-btn--confirm[disabled] { background: var(--lux-porcelain-200); color: var(--lux-text-faint); }
 </style>

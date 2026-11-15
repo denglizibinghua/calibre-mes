@@ -2,6 +2,7 @@ package com.bikeassembly.config;
 
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,9 +19,12 @@ public class RabbitMQReliabilityConfiguration {
 
     @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
-            ConnectionFactory connectionFactory) {
+            ConnectionFactory connectionFactory, MessageConverter jsonMessageConverter) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
+        // 必须显式设置 JSON 转换器：自定义工厂不会自动继承 Boot 的 MessageConverter，
+        // 否则消费端退回 SimpleMessageConverter，收到 byte[] 无法转成 DTO（MessageConversionException）。
+        factory.setMessageConverter(jsonMessageConverter);
         factory.setConcurrentConsumers(1);
         factory.setMaxConcurrentConsumers(4);
         factory.setPrefetchCount(20);

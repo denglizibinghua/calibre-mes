@@ -1,5 +1,6 @@
 package com.bikeassembly.dashboard;
 
+import com.bikeassembly.AbstractPostgresContainerIntegrationTest;
 import com.bikeassembly.context.BaseContext;
 import com.bikeassembly.dto.DashboardScreenQueryDTO;
 import com.bikeassembly.service.DashboardScreenService;
@@ -19,11 +20,11 @@ import java.time.ZoneId;
 import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Actual MySQL 8 mapper queries; unique fixtures are rolled back after each test. */
+/** Actual PostgreSQL 16 mapper queries; unique fixtures are rolled back after each test. */
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-class DashboardScreenIntegrationTest {
+class DashboardScreenIntegrationTest extends AbstractPostgresContainerIntegrationTest {
     @Autowired private DashboardScreenService service;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private Validator validator;

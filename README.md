@@ -23,7 +23,7 @@
 |---|--------|------|---------|
 | 管理端 Web | Vue 3 + TypeScript + Element Plus + Vite | 管理员、计划员、质检主管 | `/admin/**` |
 | 微信小程序 | uni-app (Vue 3) + TypeScript + Pinia | 车间工人、质检员 | `/app/**` |
-| 后端 API | Spring Boot 3.3.5 + MyBatis-Plus 3.5.7 + MySQL 8.x | — | — |
+| 后端 API | Spring Boot 3.3.5 + MyBatis-Plus 3.5.7 + PostgreSQL 16 | — | — |
 
 ---
 
@@ -101,7 +101,7 @@
 | ERP 对接 | 🟡 | 已实现可配置 ERP 同步客户端（配置 `ERP_BASE_URL` 走真实 HTTP，留空走 MOCK）、工单下达/完工与库存单据执行自动发布同步、`erp_sync_log` 幂等闭环与失败重试；接入真实 ERP 系统地址与字段映射待实际对接 |
 | AI 质检分析与 MES 助手 | 🟡 | Spring AI + OpenAI 兼容协议，支持质检分析、结构化 MES 问答和 WebSocket 流式输出；配置 `AI_OPENAI_API_KEY` 启用 |
 | 生产看板 | 🟡 | 首页看板聚合（今日完工/今日产量/在制工单/待检质检/安灯/设备状态，真实 SQL 聚合）；SPC/OEE/工时效率分析列为后续迭代 |
-| CI/CD | ✅ | Docker Compose 一键部署（MySQL/RabbitMQ/Redis/后端/Web）+ GitHub Actions 构建/测试流水线；Gitee 仓库需 Gitee Go 或镜像仓库启用 |
+| CI/CD | ✅ | Docker Compose 一键部署（PostgreSQL/RabbitMQ/Redis/后端/Web）+ GitHub Actions 构建/测试流水线；Gitee 仓库需 Gitee Go 或镜像仓库启用 |
 
 > 当前无 ❌ 待实现项：原待实现的 ERP 对接、AI 质检分析、CI/CD 均已落地（见上）。
 
@@ -116,7 +116,7 @@
 | Java | 17 | 编译目标版本 |
 | Spring Boot | 3.3.5 | 应用框架 |
 | MyBatis-Plus | 3.5.7 | ORM + 分页 + 乐观锁 |
-| MySQL | 8.0+ | 关系型数据库（utf8mb4） |
+| PostgreSQL | 16 | 关系型数据库（向量库同实例、独立数据库 mes_ai） |
 | Maven | 3.8+ | 多模块项目构建 |
 | JWT (jjwt) | 0.11.5 | 管理端+App端双通道认证 |
 | Spring AMQP (RabbitMQ) | — | 事件驱动消息队列 |
@@ -128,7 +128,7 @@
 | Jakarta Validation | — | Bean 参数校验 |
 | Lombok | 1.18.32 | 代码简化 |
 | DeepSeek API（直连） | — | 质检分析（OpenAI 兼容协议，无额外依赖） |
-| Testcontainers | 1.20.4 | 集成测试（MySQL 8.0 容器） |
+| Testcontainers | 1.20.4 | 集成测试（PostgreSQL 16 容器） |
 | JUnit 5 | — | 测试框架 |
 
 ### 管理端前端
@@ -229,7 +229,7 @@ HTTP Request
   → Controller               (参数校验 + 调用Service + 返回Result)
   → Service / ServiceImpl    (状态机校验 + 幂等处理 + 业务逻辑 + @Transactional)
   → Mapper                   (MyBatis-Plus BaseMapper + 自定义SQL)
-  → MySQL / RabbitMQ
+  → PostgreSQL / RabbitMQ
   → OperLogAspect            (操作日志自动记录)
   → Result<T>                (统一JSON响应)
 ```
@@ -266,7 +266,7 @@ HTTP Request
 | Maven | 3.8+ | 或使用 `./mvnw`（Maven Wrapper） |
 | Node.js | ≥18 且 <23 | 管理端 + 小程序构建 |
 | npm | 9+ | 随 Node.js 安装 |
-| MySQL | 8.0+ | 数据库（utf8mb4） |
+| PostgreSQL | 16 | 数据库（关系库 bike_assembly_mes + 向量库 mes_ai） |
 | Redis | 7+ | 缓存与登录失败锁定（可选，不可用时自动降级） |
 | RabbitMQ | 3.x | 消息队列（可选，开发环境默认关闭） |
 | 微信开发者工具 | 最新版 | 小程序预览调试 |
@@ -286,17 +286,17 @@ HTTP Request
 ### 全新环境初始化
 
 ```bash
-# 1. 创建数据库
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS bike_assembly_mes DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_unicode_ci;"
+# 1. 创建数据库（容器首次启动由 POSTGRES_DB 自动创建；已有实例需手动执行一次）
+docker compose exec postgres createdb -U mes bike_assembly_mes
 
 # 2. 初始化表结构 + 系统种子数据（角色/菜单/用户/配置）
-mysql -u root -p bike_assembly_mes < sql/init_database.sql
+docker compose exec -T postgres psql -U mes -d bike_assembly_mes -v ON_ERROR_STOP=1 < sql/init_database.sql
 
 # 3. 插入全表演示数据
-mysql -u root -p bike_assembly_mes < sql/dev_seed_full.sql
+docker compose exec -T postgres psql -U mes -d bike_assembly_mes -v ON_ERROR_STOP=1 < sql/dev_seed_full.sql
 
 # 4. 验证数据库
-mysql -u root -p bike_assembly_mes < sql/verify_database.sql
+docker compose exec -T postgres psql -U mes -d bike_assembly_mes -v ON_ERROR_STOP=1 < sql/verify_database.sql
 ```
 
 ### 数据库脚本说明
@@ -319,15 +319,19 @@ mysql -u root -p bike_assembly_mes < sql/verify_database.sql
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/bike_assembly_mes?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: ${MYSQL_USERNAME:root}
-    password: ${MYSQL_PASSWORD:your_password}
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5433/bike_assembly_mes
+    username: ${DB_USERNAME:mes}
+    password: ${DB_PASSWORD:your_password}
 ```
 
 也可通过环境变量覆盖：
 ```bash
-export MYSQL_USERNAME=your_user
-export MYSQL_PASSWORD=your_password
+export DB_HOST=localhost
+export DB_PORT=5433
+export DB_NAME=bike_assembly_mes
+export DB_USERNAME=your_user
+export DB_PASSWORD=your_password
 ```
 
 ### 密钥配置
@@ -350,7 +354,7 @@ export MYSQL_PASSWORD=your_password
 | `AI_CONTEXT_MAX_CHARS` | 单次问答最大上下文字符数，默认 `12000` |
 | `AI_RAG_MIN_SIMILARITY` | RAG 最低相似度阈值，默认 `0.70` |
 | `AI_EMBEDDING_MODEL` | Embedding 模型名；启用 PGVector 时必须由部署环境提供 |
-| `AI_PGVECTOR_ENABLED` | PGVector 开关，默认关闭；启用后使用独立 PostgreSQL 数据源，不影响 MySQL MES |
+| `AI_PGVECTOR_ENABLED` | PGVector 开关，默认关闭；启用后使用独立 PostgreSQL 数据源，不影响 MES 关系库 |
 | `AI_PGVECTOR_URL` | PGVector PostgreSQL JDBC 地址 |
 | `AI_PGVECTOR_USERNAME` / `AI_PGVECTOR_PASSWORD` | PGVector 数据库账号 |
 | `AI_PGVECTOR_INITIALIZE_SCHEMA` | 首次连接空库时自动创建向量表；Compose 示例默认 `true`，本地配置可设为 `false` |
@@ -365,7 +369,7 @@ export MYSQL_PASSWORD=your_password
 - 本地 IDE/`mvn spring-boot:run` 使用 `dev` profile 时，可在 `application-dev.yml` 中引用环境变量；该文件里的 `${AI_OPENAI_API_KEY:...}` 和 `${AI_CHAT_MODEL:}` 是占位符，不会自动提供真实值。
 - 使用本仓库的 Docker Compose（包括 WSL Docker）时，Compose 默认启用 `prod` profile，且不会读取 `application-dev.yml`。请在项目根目录 `.env` 设置模型及 Key；不要把 `.env` 提交到 Git。修改 `.env` 后需重建后端容器使变量生效。
 
-PGVector RAG 使用独立 PostgreSQL，不会替代 MES 的 MySQL。仓库默认使用本地
+PGVector RAG 使用同一 PostgreSQL 实例下的独立数据库 `mes_ai`，不会替代 MES 关系库。仓库默认使用本地
 `BAAI/bge-m3` Embedding，输出维度为 `1024`。先在项目根目录 `.env` 确认
 `AI_PGVECTOR_ENABLED=true`、`AI_EMBEDDING_MODEL=BAAI/bge-m3`、
 `AI_PGVECTOR_DIMENSIONS=1024`，然后启动向量库和 Embedding 服务。默认使用固定的
@@ -377,8 +381,8 @@ vLLM `v0.32.0` CUDA 13.0 镜像；请确认宿主机 NVIDIA 驱动与该 CUDA �
 # Eslzzyl/Qwen3-4B-Instruct-2507-AWQ 权重放到 models/qwen3-4b-awq，
 # BAAI/bge-m3 权重放到 models/bge-m3；也可在 .env 中覆盖本地目录。
 # 首次载入 CPU Embedding 模型会较慢。
-docker compose --profile pgvector --profile local-embedding-cpu --profile local-chat up -d pgvector embedding-cpu chat-model
-docker compose --profile pgvector --profile local-embedding-cpu --profile local-chat ps
+docker compose --profile local-embedding-cpu --profile local-chat up -d postgres embedding-cpu chat-model
+docker compose --profile local-embedding-cpu --profile local-chat ps
 
 # 再启动后端和 Web
 docker compose up -d --build backend web
@@ -393,13 +397,13 @@ CPU Embedding 容器使用 FlagEmbedding 加载本地 BGE-M3，并向 Spring AI 
 如果使用第三方 Embedding API，可不启动本地 profile，并在 `.env` 配置该服务可达的
 `AI_EMBEDDING_BASE_URL`、`AI_EMBEDDING_MODEL`、`AI_EMBEDDING_API_KEY` 和真实输出维度。
 
-全新 MySQL 数据卷会按 Compose 顺序自动执行 AI 数据表、权限和阶段二补丁。已有数据库不会重跑初始化脚本，
+全新 PostgreSQL 数据卷会按 Compose 顺序自动执行 AI 数据表、权限和阶段二补丁。已有数据库不会重跑初始化脚本，
 需在项目根目录手动执行一次：
 
 ```bash
-mysql -u root -p bike_assembly_mes < sql/patch_ai_reliability_v1.sql
-mysql -u root -p bike_assembly_mes < sql/patch_ai_permissions_v1.sql
-mysql -u root -p bike_assembly_mes < sql/patch_ai_phase2.sql
+docker compose exec -T postgres psql -U mes -d bike_assembly_mes -v ON_ERROR_STOP=1 < sql/patch_ai_reliability_v1.sql
+docker compose exec -T postgres psql -U mes -d bike_assembly_mes -v ON_ERROR_STOP=1 < sql/patch_ai_permissions_v1.sql
+docker compose exec -T postgres psql -U mes -d bike_assembly_mes -v ON_ERROR_STOP=1 < sql/patch_ai_phase2.sql
 ```
 
 公共上传和个人上传文件分别写入 `public-ai-files` 与 `private-ai-files` Docker 卷，
@@ -419,7 +423,7 @@ Cypher。图谱范围按公共资料或当前用户私有资料过滤。
 
 本地人脸服务是独立 CPU 容器，需要预先准备 YuNet、SFace 和 MiniFASNet ONNX 权重到
 `models/face/`，然后启用 `local-face` profile。缺少任一模型、摄像头画面中不是单张人脸或活体未通过，
-服务均会拒绝注册/登录。模板在 MySQL 中 AES-GCM 加密保存，照片只在请求内存中处理。
+服务均会拒绝注册/登录。模板在 PostgreSQL 中 AES-GCM 加密保存，照片只在请求内存中处理。
 MiniFASNet 预处理和类别顺序依具体 checkpoint 而异，默认配置必须用真实摄像头与回放样本校准；
 这只是演示级基线，不是生产级反欺骗保障。
 
@@ -428,7 +432,7 @@ docker compose --profile local-face up -d --build face
 ```
 
 向量表使用独立名称 `vector_store_bge_m3_1024`，避免和先前使用错误维度创建的表冲突；不会删除旧表或
-PGVector 数据卷。修改 Embedding 模型或维度时，应使用新的 `AI_PGVECTOR_TABLE` 名称并重新索引文档。
+PostgreSQL 数据卷（`postgres-data`）。修改 Embedding 模型或维度时，应使用新的 `AI_PGVECTOR_TABLE` 名称并重新索引文档。
 
 启动后登录管理端，在“AI 助手”页面点击“索引知识库”，或调用：
 
@@ -438,7 +442,7 @@ GET  /admin/ai/knowledge/status
 GET  /admin/ai/knowledge/tasks/{taskId}
 ```
 
-索引接口异步返回 `taskId`，任务状态持久化在 MySQL；Redis 可用时使用分布式锁，避免多
+索引接口异步返回 `taskId`，任务状态持久化在 PostgreSQL；Redis 可用时使用分布式锁，避免多
 实例重复索引。索引器读取 `AI_KNOWLEDGE_PATH` 下的 `.md`/`.txt`/`.pdf`/`.docx`/`.xlsx`/`.pptx` 文件，按文件 SHA-256
 增量更新，忽略 `target`、`node_modules`、`dist`、`build` 和 `.git` 目录；文档变化时会
 先删除同一 source 的旧 chunk，再写入新向量，删除文件时也会清理旧向量。服务重启后会从
@@ -448,13 +452,13 @@ GET  /admin/ai/knowledge/tasks/{taskId}
 没有 Embedding 模型、维度或 PGVector 配置时状态为 `NOT_CONFIGURED`，只做文档清单扫描，
 不会在索引阶段隐式写入失败。问答返回的 `sources` 会包含文件、chunk 和更新时间，模型
 回答被要求使用 `[来源1]` 形式引用，服务端会清理未提供的引用。PGVector 使用独立数据源，
-避免把 MySQL 主数据源用于向量表。Docker 镜像会默认携带仓库根目录 `docs/`；额外工艺
+避免把 MES 主数据源用于向量表。Docker 镜像会默认携带仓库根目录 `docs/`；额外工艺
 文档可通过 `AI_KNOWLEDGE_PATH` 指向挂载目录。
 
 索引只依赖 Embedding 服务；要让问答基于检索到的文档生成回答，还需配置可用的
 `AI_OPENAI_API_KEY` 和 `AI_CHAT_MODEL`。
 
-“已索引文档/chunk”统计的是 MySQL 中的知识库文件清单和文本分块，不代表已写入向量。
+“已索引文档/chunk”统计的是 PostgreSQL 中的知识库文件清单和文本分块，不代表已写入向量。
 当 `AI_PGVECTOR_ENABLED=false` 时这些文档不会参与语义向量检索，因此界面同时显示
 “未配置向量库”是预期状态。启用前必须先验证 Embedding API 可用，并确认返回向量维度；
 Chat 模型不能代替 Embedding 模型。仓库的 BGE-M3 配置为 `1024` 维。
@@ -487,8 +491,8 @@ POST /admin/ai/plans/{planId}/confirm
 如果数据库已经存在，Docker 的 `init_database.sql` 不会再次执行。请在停写并备份后按顺序执行：
 
 ```bash
-mysql -u root -p bike_assembly_mes < sql/patch_ai_reliability_v1.sql
-mysql -u root -p bike_assembly_mes < sql/patch_ai_permissions_v1.sql
+docker compose exec -T postgres psql -U mes -d bike_assembly_mes -v ON_ERROR_STOP=1 < sql/patch_ai_reliability_v1.sql
+docker compose exec -T postgres psql -U mes -d bike_assembly_mes -v ON_ERROR_STOP=1 < sql/patch_ai_permissions_v1.sql
 ```
 
 这两个 patch 会增加 `sys_user.work_unit_id`、AI 审计表、知识库清单/任务表、排产草稿字段
@@ -540,8 +544,8 @@ spring:
 
 ### Docker Compose 一键部署
 
-仓库根目录提供 `docker-compose.yml`，一条命令拉起 MySQL 8、RabbitMQ、Redis、
-PGVector、本地 CPU BGE-M3 Embedding、本地 Qwen 聊天模型、后端和 Web 管理端。
+仓库根目录提供 `docker-compose.yml`，一条命令拉起 PostgreSQL 16（关系库 + PGVector 向量库同实例）、
+RabbitMQ、Redis、本地 CPU BGE-M3 Embedding、本地 Qwen 聊天模型、后端和 Web 管理端。
 本地 Qwen 聊天模型需要兼容的 NVIDIA GPU 与驱动；BGE-M3 默认走 CPU：
 
 ```bash
@@ -549,7 +553,7 @@ PGVector、本地 CPU BGE-M3 Embedding、本地 Qwen 聊天模型、后端和 We
 cp .env.example .env
 
 # 构建并启动本地 RAG/聊天全栈（首次启动会自动执行初始化 SQL）
-docker compose --profile pgvector --profile local-embedding-cpu --profile local-chat up -d --build
+docker compose --profile local-embedding-cpu --profile local-chat up -d --build
 
 # 查看状态
 docker compose ps
@@ -567,7 +571,7 @@ docker compose ps
 
 - 默认使用 `prod` profile，JWT 密钥通过 `JWT_ADMIN_SECRET` / `JWT_APP_SECRET` 注入（`.env` 中默认值仅供演示，上线前必须替换）；
 - nginx 将 `/admin`、`/app`、`/ws` 反代到后端，Web 端走同源请求，无跨域问题；
-- MySQL 数据持久化在 `mysql-data` 卷，删除卷后重新 `up` 会再次执行初始化脚本；
+- PostgreSQL 数据持久化在 `postgres-data` 卷（关系库与 `mes_ai` 向量库共用同一个实例），删除卷后重新 `up` 会再次执行初始化脚本；
 - Neo4j 与人脸服务按需启用 `graphrag`、`local-face` profile；人脸服务需要先准备 ONNX 权重；
 - CI 流水线见 `.github/workflows/ci.yml`（后端 `mvn test` + Web 构建/测试 + 小程序 type-check/构建 + Docker 镜像构建）。
 
@@ -690,10 +694,10 @@ npm run test
 ```
 
 > 说明：
-> - 集成测试使用 Testcontainers 启动 MySQL 8 容器，需本机可用 Docker；
+> - 集成测试使用 Testcontainers 启动 PostgreSQL 16 容器，需本机可用 Docker；
 > - Docker 29+（最低 API 1.40）需在 `~/.testcontainers.properties` 配置 `api.version=1.44` 兼容旧客户端；
 > - `ProductionFlowIntegrationTest` / `QcPassMainFlowIntegrationTest` 依赖测试种子数据：
->   `mysql -u root -p123456 bike_assembly_mes < sql/test/seed_production_flow.sql`
+>   `docker compose exec -T postgres psql -U mes -d bike_assembly_mes -v ON_ERROR_STOP=1 < sql/test/seed_production_flow.sql`
 
 ### 前端测试
 
@@ -728,7 +732,7 @@ cd bike-assembly-mes-miniapp && npm run test # 小程序
 
 本项目严格遵循 **苍穹外卖** 风格分层架构（详见 `.claude/CLAUDE.md`）：
 
-1. **分层架构**：Controller → Service(接口) → ServiceImpl → Mapper → MySQL
+1. **分层架构**：Controller → Service(接口) → ServiceImpl → Mapper → PostgreSQL
 2. **Spring IoC**：所有组件由 Spring 容器管理，禁止手动 new
 3. **Controller 职责**：仅做参数接收、参数校验、调用 Service、返回 `Result<T>`
 4. **Service 职责**：业务逻辑、事务管理（`@Transactional`）、状态机校验

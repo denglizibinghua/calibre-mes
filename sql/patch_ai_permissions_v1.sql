@@ -1,4 +1,4 @@
-SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+SET client_encoding TO 'UTF8';
 
 INSERT INTO sys_menu
     (menu_id, parent_id, menu_name, path, component, icon, visible, keep_alive,
@@ -10,17 +10,17 @@ VALUES
      'admin:ai:knowledge-manage', 'F', 1, '0'),
     (1603, 1601, '确认排产建议', NULL, NULL, NULL, '0', '0', NULL,
      'admin:ai:plan-confirm', 'F', 2, '0')
-ON DUPLICATE KEY UPDATE
-    menu_name = VALUES(menu_name),
-    path = VALUES(path),
-    component = VALUES(component),
-    icon = VALUES(icon),
-    visible = VALUES(visible),
-    keep_alive = VALUES(keep_alive),
-    perms = VALUES(perms),
-    menu_type = VALUES(menu_type),
-    order_num = VALUES(order_num),
-    status = VALUES(status);
+ON CONFLICT (menu_id) DO UPDATE SET
+    menu_name = EXCLUDED.menu_name,
+    path = EXCLUDED.path,
+    component = EXCLUDED.component,
+    icon = EXCLUDED.icon,
+    visible = EXCLUDED.visible,
+    keep_alive = EXCLUDED.keep_alive,
+    perms = EXCLUDED.perms,
+    menu_type = EXCLUDED.menu_type,
+    order_num = EXCLUDED.order_num,
+    status = EXCLUDED.status;
 
 INSERT INTO sys_role_menu (role_id, menu_id)
 SELECT r.role_id, m.menu_id

@@ -9,7 +9,7 @@
 
     <update id="reacquire">
         UPDATE pro_idempotency_record
-        SET process_status = '0', updated_at = NOW(),
+        SET process_status = '0', updated_at = CURRENT_TIMESTAMP,
             response_code = NULL, response_data = NULL, business_id = NULL
         WHERE id = #{id} AND process_status = #{expectedStatus}
           AND (process_status = '2' OR
@@ -17,13 +17,13 @@
     </update>
 
     <!--
-      原子占位：key 不存在时插入（INSERT IGNORE），已存在时返回 0。
+      原子占位：key 不存在时插入（ON CONFLICT DO NOTHING），已存在时返回 0。
       [并发控制] 依赖数据库唯一索引 uk_idm_user_op_key (operator_id, business_type, action, idempotency_key)
       保证同一用户、同一业务类型、同一操作、同一幂等键只插入一条记录。
       受影响行数 = 1 表示成功占位，= 0 表示 key 已存在。
     -->
     <insert id="insertIfAbsent">
-        INSERT IGNORE INTO pro_idempotency_record
+        INSERT INTO pro_idempotency_record
             (idempotency_key, business_type, business_id, action,
              request_hash, process_status, response_code, response_data,
              operator_id, create_time, updated_at, expire_time)
@@ -31,6 +31,7 @@
             (#{record.idempotencyKey}, #{record.businessType}, #{record.businessId}, #{record.action},
              #{record.requestHash}, #{record.processStatus}, #{record.responseCode}, #{record.responseData},
              #{record.operatorId}, #{record.createTime}, #{record.updatedAt}, #{record.expireTime})
+        ON CONFLICT (operator_id, business_type, action, idempotency_key) DO NOTHING
     </insert>
 
     <!-- 更新处理结果（状态 + 响应码 + 响应数据 + 业务ID） -->
@@ -40,7 +41,7 @@
             response_code = #{responseCode},
             response_data = #{responseData},
             business_id = #{businessId},
-            updated_at = NOW()
+            updated_at = CURRENT_TIMESTAMP
         WHERE id = #{id}
     </update>
 
@@ -48,7 +49,7 @@
     <update id="updateStatusOnly">
         UPDATE pro_idempotency_record
         SET process_status = #{processStatus},
-            updated_at = NOW()
+            updated_at = CURRENT_TIMESTAMP
         WHERE id = #{id}
     </update>
 

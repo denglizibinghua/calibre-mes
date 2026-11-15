@@ -32,7 +32,7 @@
         <text class="form-label">账号</text>
         <view class="input-wrapper">
           <image class="input-icon" src="/static/icons/profile.svg" mode="aspectFit" />
-          <input class="form-input" v-model="form.username" placeholder="请输入用户名" placeholder-style="color: #a7b1c2" :disabled="submitting" />
+          <input class="form-input" v-model="form.username" placeholder="请输入用户名" placeholder-style="color: #6F6A5F" :disabled="submitting" />
         </view>
       </view>
 
@@ -40,7 +40,7 @@
         <text class="form-label">密码</text>
         <view class="input-wrapper">
           <image class="input-icon" src="/static/icons/lock.svg" mode="aspectFit" />
-          <input class="form-input" v-model="form.password" type="text" :password="!showPassword" placeholder="请输入密码" placeholder-style="color: #a7b1c2" :disabled="submitting" />
+          <input class="form-input" v-model="form.password" type="text" :password="!showPassword" placeholder="请输入密码" placeholder-style="color: #6F6A5F" :disabled="submitting" />
           <button class="password-eye" :aria-label="showPassword ? '隐藏密码' : '显示密码'" :disabled="submitting" @tap.stop="showPassword = !showPassword">
             <image class="eye-icon" :src="showPassword ? '/static/icons/eye-open.svg' : '/static/icons/eye-closed.svg'" mode="aspectFit" />
           </button>
@@ -80,6 +80,7 @@ import { useUserStore } from '@/stores/user'
 import type { LoginRequest, LoginResponse, WxLoginResponse } from '@/types/api'
 
 import { getCustomContentTop } from '@/utils/customNavigation'
+import { captureFaceImage } from '@/utils/faceCapture'
 
 const contentTop = ref(getCustomContentTop())
 const userStore = useUserStore()
@@ -165,33 +166,6 @@ async function completeLogin(data: LoginResponse): Promise<void> {
   setTimeout(() => {
     uni.reLaunch({ url: '/pages/home/index' })
   }, 1000)
-}
-
-/** 相机采集的照片只转 Base64 发送，本地不保留副本。 */
-async function captureFaceImage(): Promise<string | null> {
-  // #ifndef MP-WEIXIN
-  uni.showToast({ title: '请在微信小程序中使用相机识别', icon: 'none' })
-  return null
-  // #endif
-  return new Promise((resolve) => {
-    uni.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['camera'],
-      camera: 'front',
-      success: (result) => {
-        const file = result.tempFiles?.[0]
-        if (!file?.tempFilePath) return resolve(null)
-        uni.getFileSystemManager().readFile({
-          filePath: file.tempFilePath,
-          encoding: 'base64',
-          success: (readResult) => resolve(String(readResult.data)),
-          fail: () => resolve(null),
-        })
-      },
-      fail: () => resolve(null),
-    })
-  })
 }
 
 async function handleFaceLogin(): Promise<void> {
@@ -297,6 +271,7 @@ async function handleWxLogin(): Promise<void> {
 
 <style scoped>
 .login-page { display: flex; min-height: 100vh; flex-direction: column; align-items: center; background: var(--lux-porcelain-100); padding-bottom: env(safe-area-inset-bottom); }
+.login-hero::before { content: ''; position: absolute; top: 24rpx; left: 24rpx; width: 28rpx; height: 28rpx; border-top: 1rpx solid var(--lux-gold-500); border-left: 1rpx solid var(--lux-gold-500); pointer-events: none; }
 .login-hero { position: relative; width: 100%; min-height: 560rpx; padding: calc(env(safe-area-inset-top, 0rpx) + 54rpx) 44rpx 150rpx; overflow: hidden; background: var(--lux-hero-gradient); border-bottom: 1rpx solid var(--lux-shell-line-strong); }
 .hero-grid { display: none; }
 .hero-circle { position: absolute; border: 1rpx solid var(--lux-shell-line); border-radius: var(--lux-radius-round); }
@@ -314,6 +289,7 @@ async function handleWxLogin(): Promise<void> {
 .hero-slogan { display: block; max-width: 590rpx; margin-top: 34rpx; color: var(--lux-shell-text); font-size: 27rpx; font-weight: 400; line-height: 1.6; }
 .capability-row { display: flex; align-items: center; margin-top: 24rpx; color: var(--lux-shell-muted); font-size: 20rpx; letter-spacing: 1rpx; }
 .capability-dot { width: 5rpx; height: 5rpx; margin: 0 13rpx; border-radius: var(--lux-radius-round); background: var(--lux-gold-500); }
+.login-card::before { content: ''; position: absolute; top: 14rpx; left: 14rpx; width: 20rpx; height: 20rpx; border-top: 1rpx solid var(--lux-gold-500); border-left: 1rpx solid var(--lux-gold-500); pointer-events: none; }
 .login-card { position: relative; z-index: 3; width: calc(100% - 56rpx); margin-top: -104rpx; padding: 38rpx 32rpx 32rpx; border: 1rpx solid var(--lux-line); border-radius: var(--lux-radius-md); background: var(--lux-surface); box-shadow: var(--lux-shadow-card); }
 .card-heading { display: flex; flex-direction: column; margin-bottom: 30rpx; }
 .card-title { color: var(--lux-ink-900); font-size: 36rpx; font-weight: 600; letter-spacing: 1rpx; }

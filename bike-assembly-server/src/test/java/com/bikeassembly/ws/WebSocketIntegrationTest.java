@@ -38,7 +38,9 @@ import static org.junit.jupiter.api.Assertions.*;
                 "bike.jwt.admin.access-token-ttl=60000", "bike.jwt.admin.refresh-token-ttl=120000",
                 "bike.jwt.app.access-token-ttl=60000", "bike.jwt.app.refresh-token-ttl=120000",
                 "bike.jwt.admin.token-name=token", "bike.jwt.app.token-name=token",
-                "bike.cors.allowed-origins=http://localhost:5173"
+                "bike.cors.allowed-origins=http://localhost:5173",
+                "spring.ai.openai.api-key=test-only-no-provider",
+                "spring.ai.openai.embedding.api-key=test-only-no-provider"
         })
 class WebSocketIntegrationTest {
     @Configuration

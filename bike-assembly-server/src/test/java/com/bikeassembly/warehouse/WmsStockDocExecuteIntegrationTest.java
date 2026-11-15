@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @SpringBootTest
 @ActiveProfiles("test")
-class WmsStockDocExecuteIntegrationTest extends com.bikeassembly.AbstractMySqlContainerIntegrationTest {
+class WmsStockDocExecuteIntegrationTest extends com.bikeassembly.AbstractPostgresContainerIntegrationTest {
 
     @Autowired
     private WmsStockDocService wmsStockDocService;

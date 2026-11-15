@@ -1,6 +1,6 @@
 package com.bikeassembly.workflow;
 
-import com.bikeassembly.AbstractMySqlContainerIntegrationTest;
+import com.bikeassembly.AbstractPostgresContainerIntegrationTest;
 import com.bikeassembly.enums.*;
 import com.bikeassembly.mapper.*;
 import com.bikeassembly.service.*;
@@ -18,13 +18,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * V3.4 工序流转状态机集成测试。
- * 使用 Testcontainers MySQL 8，Schema 由 init_database.sql / migration 提供。
+ * 使用 Testcontainers PostgreSQL 16，Schema 由 init_database.sql 提供。
  * 不得修改数据库结构——只查询、调用接口、断言。
  */
 @SpringBootTest
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class WorkflowStateMachineIntegrationTest extends AbstractMySqlContainerIntegrationTest {
+class WorkflowStateMachineIntegrationTest extends AbstractPostgresContainerIntegrationTest {
 
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private ProWorkProcessMapper proWorkProcessMapper;
@@ -37,7 +37,7 @@ class WorkflowStateMachineIntegrationTest extends AbstractMySqlContainerIntegrat
     void schema_workOrderHasRequestId() {
         Integer cnt = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM information_schema.COLUMNS " +
-            "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='pro_work_order' AND COLUMN_NAME='request_id'", Integer.class);
+            "WHERE table_schema=current_schema() AND table_name='pro_work_order' AND COLUMN_NAME='request_id'", Integer.class);
         assertTrue(cnt != null && cnt > 0, "pro_work_order 缺少 request_id");
     }
 
@@ -46,7 +46,7 @@ class WorkflowStateMachineIntegrationTest extends AbstractMySqlContainerIntegrat
     void schema_workOrderHasVersion() {
         Integer cnt = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM information_schema.COLUMNS " +
-            "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='pro_work_order' AND COLUMN_NAME='version'", Integer.class);
+            "WHERE table_schema=current_schema() AND table_name='pro_work_order' AND COLUMN_NAME='version'", Integer.class);
         assertTrue(cnt != null && cnt > 0, "pro_work_order 缺少 version");
     }
 
@@ -55,7 +55,7 @@ class WorkflowStateMachineIntegrationTest extends AbstractMySqlContainerIntegrat
     void schema_workProcessHasStepSeq() {
         Integer cnt = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM information_schema.COLUMNS " +
-            "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='pro_work_process' AND COLUMN_NAME='step_seq'", Integer.class);
+            "WHERE table_schema=current_schema() AND table_name='pro_work_process' AND COLUMN_NAME='step_seq'", Integer.class);
         assertTrue(cnt != null && cnt > 0, "pro_work_process 缺少 step_seq");
     }
 
@@ -64,7 +64,7 @@ class WorkflowStateMachineIntegrationTest extends AbstractMySqlContainerIntegrat
     void schema_workProcessHasVersion() {
         Integer cnt = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM information_schema.COLUMNS " +
-            "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='pro_work_process' AND COLUMN_NAME='version'", Integer.class);
+            "WHERE table_schema=current_schema() AND table_name='pro_work_process' AND COLUMN_NAME='version'", Integer.class);
         assertTrue(cnt != null && cnt > 0, "pro_work_process 缺少 version");
     }
 
@@ -72,8 +72,8 @@ class WorkflowStateMachineIntegrationTest extends AbstractMySqlContainerIntegrat
     @Order(5)
     void schema_stepSeqHasUniqueIndex() {
         Integer cnt = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM information_schema.STATISTICS " +
-            "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='pro_work_process' AND INDEX_NAME='uk_wp_wo_step'", Integer.class);
+            "SELECT COUNT(*) FROM pg_indexes " +
+            "WHERE schemaname=current_schema() AND tablename='pro_work_process' AND indexname='uk_wp_wo_step'", Integer.class);
         assertTrue(cnt != null && cnt > 0, "缺少 (work_order_id, step_seq) 唯一索引");
     }
 
@@ -82,7 +82,7 @@ class WorkflowStateMachineIntegrationTest extends AbstractMySqlContainerIntegrat
     void schema_qmsInspectionHasVersion() {
         Integer cnt = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM information_schema.COLUMNS " +
-            "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='qms_inspection' AND COLUMN_NAME='version'", Integer.class);
+            "WHERE table_schema=current_schema() AND table_name='qms_inspection' AND COLUMN_NAME='version'", Integer.class);
         assertTrue(cnt != null && cnt > 0, "qms_inspection 缺少 version");
     }
 
@@ -91,7 +91,7 @@ class WorkflowStateMachineIntegrationTest extends AbstractMySqlContainerIntegrat
     void schema_transitionLogTableExists() {
         Integer cnt = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM information_schema.TABLES " +
-            "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='pro_status_transition_log'", Integer.class);
+            "WHERE table_schema=current_schema() AND table_name='pro_status_transition_log'", Integer.class);
         assertTrue(cnt != null && cnt > 0, "缺少 pro_status_transition_log 表");
     }
 
@@ -100,12 +100,12 @@ class WorkflowStateMachineIntegrationTest extends AbstractMySqlContainerIntegrat
     void schema_idempotencyTableExists() {
         Integer cnt = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM information_schema.TABLES " +
-            "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='pro_idempotency_record'", Integer.class);
+            "WHERE table_schema=current_schema() AND table_name='pro_idempotency_record'", Integer.class);
         assertTrue(cnt != null && cnt > 0, "缺少 pro_idempotency_record 表");
 
         Integer idxCnt = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM information_schema.STATISTICS " +
-            "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='pro_idempotency_record' AND INDEX_NAME='uk_idm_user_op_key'", Integer.class);
+            "SELECT COUNT(*) FROM pg_indexes " +
+            "WHERE schemaname=current_schema() AND tablename='pro_idempotency_record' AND indexname='uk_idm_user_op_key'", Integer.class);
         assertTrue(idxCnt != null && idxCnt > 0, "pro_idempotency_record 缺少唯一索引 uk_idm_user_op_key");
     }
 
@@ -114,7 +114,7 @@ class WorkflowStateMachineIntegrationTest extends AbstractMySqlContainerIntegrat
     void schema_messageConsumeLogTableExists() {
         Integer cnt = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM information_schema.TABLES " +
-            "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='pro_message_consume_log'", Integer.class);
+            "WHERE table_schema=current_schema() AND table_name='pro_message_consume_log'", Integer.class);
         assertTrue(cnt != null && cnt > 0, "缺少 pro_message_consume_log 表");
     }
 

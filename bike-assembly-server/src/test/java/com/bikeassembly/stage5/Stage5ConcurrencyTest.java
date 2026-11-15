@@ -12,7 +12,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * 阶段5 并发和原子性单元测试（Mockito，无 MySQL/Spring 依赖）。
+ * 阶段5 并发和原子性单元测试（Mockito，无数据库/Spring 依赖）。
  *
  * 注意：因 LambdaUpdateWrapper 在纯 Mockito 环境下无法初始化 MP TableInfo 缓存，
  * 涉及内部创建 LambdaUpdateWrapper 的 Service 方法（如 accept/complete/close）

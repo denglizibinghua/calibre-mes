@@ -1,6 +1,7 @@
 package com.bikeassembly.erp;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.bikeassembly.AbstractPostgresContainerIntegrationTest;
 import com.bikeassembly.dto.message.ErpSyncMessageDTO;
 import com.bikeassembly.entity.ErpSyncLog;
 import com.bikeassembly.entity.ProWorkOrder;
@@ -8,6 +9,7 @@ import com.bikeassembly.mapper.ErpSyncLogMapper;
 import com.bikeassembly.mapper.ProWorkOrderMapper;
 import com.bikeassembly.service.ErpSyncLogService;
 import com.bikeassembly.vo.ErpSyncLogVO;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -40,7 +42,12 @@ import static org.junit.jupiter.api.Assertions.fail;
         "spring.rabbitmq.listener.simple.auto-startup=true"
 })
 @DisplayName("ERP 同步全链路集成测试")
-class ErpSyncFlowIntegrationTest {
+class ErpSyncFlowIntegrationTest extends AbstractPostgresContainerIntegrationTest {
+
+    @BeforeAll
+    static void seedProductionFlow() {
+        executeSql("sql/test/seed_production_flow.sql");
+    }
 
     @Container
     static final RabbitMQContainer RABBIT =

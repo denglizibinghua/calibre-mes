@@ -1,5 +1,6 @@
 package com.bikeassembly.dashboard;
 
+import com.bikeassembly.AbstractPostgresContainerIntegrationTest;
 import com.bikeassembly.mapper.ProWorkOrderMapper;
 import com.bikeassembly.service.DashboardService;
 import com.bikeassembly.vo.DashboardVO;
@@ -13,12 +14,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * 生产运营看板集成测试（本地 MySQL，真实 SQL 聚合）。
+ * 生产运营看板集成测试（容器化 PostgreSQL，真实 SQL 聚合）。
  */
 @SpringBootTest
 @ActiveProfiles("test")
 @DisplayName("生产运营看板集成测试")
-class DashboardServiceIntegrationTest {
+class DashboardServiceIntegrationTest extends AbstractPostgresContainerIntegrationTest {
 
     @Autowired
     private DashboardService dashboardService;

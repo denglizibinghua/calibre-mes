@@ -1,6 +1,6 @@
 package com.bikeassembly.idempotency;
 
-import com.bikeassembly.AbstractMySqlContainerIntegrationTest;
+import com.bikeassembly.AbstractPostgresContainerIntegrationTest;
 import com.bikeassembly.constant.MessageConstant;
 import com.bikeassembly.context.BaseContext;
 import com.bikeassembly.entity.ProIdempotencyRecord;
@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class IdempotencyIntegrationTest extends AbstractMySqlContainerIntegrationTest {
+class IdempotencyIntegrationTest extends AbstractPostgresContainerIntegrationTest {
 
     @Autowired
     private IdempotencyService idempotencyService;

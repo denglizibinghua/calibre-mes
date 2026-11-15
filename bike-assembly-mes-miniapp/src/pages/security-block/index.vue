@@ -97,17 +97,19 @@ async function handleLogout(): Promise<void> {
 .block-card {
   width: 100%;
   background: var(--lux-surface);
+  border: 1rpx solid var(--lux-line);
   border-radius: var(--lux-radius-md);
   padding: 56rpx 40rpx 44rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
-  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.04);
+  box-shadow: var(--lux-shadow-card);
 }
 
 .icon-wrap {
   width: 108rpx;
   height: 108rpx;
+  border: 1rpx solid var(--lux-ember-line);
   border-radius: var(--lux-radius-sm);
   background: var(--lux-ember-50);
   display: flex;
@@ -125,6 +127,7 @@ async function handleLogout(): Promise<void> {
 .block-title {
   font-size: 36rpx;
   font-weight: 600;
+  letter-spacing: 1rpx;
   color: var(--lux-ember-600);
   margin-bottom: 16rpx;
 }
@@ -140,6 +143,7 @@ async function handleLogout(): Promise<void> {
 .rules-card {
   width: 100%;
   background: var(--lux-surface-soft);
+  border: 1rpx solid var(--lux-line);
   border-radius: var(--lux-radius-sm);
   padding: 24rpx 28rpx;
   margin-bottom: 36rpx;
@@ -148,7 +152,7 @@ async function handleLogout(): Promise<void> {
 
 .rules-title {
   font-size: 26rpx;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--lux-ink-900);
   margin-bottom: 14rpx;
   display: block;
@@ -178,12 +182,12 @@ async function handleLogout(): Promise<void> {
   width: 100%;
   height: 88rpx;
   line-height: 88rpx;
-  background: var(--lux-wine);
-  color: var(--lux-porcelain-50);
+  background: var(--lux-surface);
+  color: var(--lux-wine);
   font-size: 30rpx;
-  font-weight: 600;
+  font-weight: 500;
   border-radius: var(--lux-radius-sm);
-  border: none;
+  border: 1rpx solid var(--lux-wine);
 }
 
 .logout-btn:active {

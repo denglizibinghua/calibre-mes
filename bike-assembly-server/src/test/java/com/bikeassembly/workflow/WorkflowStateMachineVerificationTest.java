@@ -1,6 +1,6 @@
 package com.bikeassembly.workflow;
 
-import com.bikeassembly.AbstractMySqlContainerIntegrationTest;
+import com.bikeassembly.AbstractPostgresContainerIntegrationTest;
 import com.bikeassembly.entity.ProWorkOrder;
 import com.bikeassembly.entity.ProWorkProcess;
 import com.bikeassembly.entity.QmsInspection;
@@ -26,11 +26,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 生产闭环状态机验证测试。
- * 需要 Docker + Testcontainers MySQL 环境。
+ * 需要 Docker + Testcontainers PostgreSQL 环境。
  * 执行命令：mvn test -pl bike-assembly-server -Dtest=WorkflowStateMachineVerificationTest
  */
 @SpringBootTest
-public class WorkflowStateMachineVerificationTest extends AbstractMySqlContainerIntegrationTest {
+public class WorkflowStateMachineVerificationTest extends AbstractPostgresContainerIntegrationTest {
 
     @Autowired private ProWorkOrderService proWorkOrderService;
     @Autowired private ProWorkProcessService proWorkProcessService;
@@ -157,11 +157,11 @@ public class WorkflowStateMachineVerificationTest extends AbstractMySqlContainer
     private ProWorkOrder createTestWorkOrder() {
         // 容器库仅 init_database.sql 初始化（无演示数据），先补基础物料供外键引用
         jdbcTemplate.update(
-                "INSERT IGNORE INTO base_item (item_id, item_code, item_name, item_type, unit, status) " +
-                "VALUES (1, 'IT-TEST-001', '测试物料', '1', '台', '0')");
+                "INSERT INTO base_item (item_id, item_code, item_name, item_type, unit, status) " +
+                "VALUES (1, 'IT-TEST-001', '测试物料', '1', '台', '0') ON CONFLICT DO NOTHING");
         jdbcTemplate.update(
-                "INSERT IGNORE INTO base_process (process_id, process_code, process_name, standard_minutes, status) " +
-                "VALUES (1, 'IT-PROC-001', '测试工序', 10, '0')");
+                "INSERT INTO base_process (process_id, process_code, process_name, standard_minutes, status) " +
+                "VALUES (1, 'IT-PROC-001', '测试工序', 10, '0') ON CONFLICT DO NOTHING");
         ProWorkOrder order = new ProWorkOrder();
         order.setWorkOrderNo("TEST_AUTO_COMPLETE_" + System.currentTimeMillis());
         order.setItemId(1L);

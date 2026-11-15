@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 public interface ProIdempotencyRecordMapper extends BaseMapper<ProIdempotencyRecord> {
 
     /**
-     * 原子占位：INSERT ... ON DUPLICATE KEY 不做任何更新（幂等键冲突时返回 0）。
+     * 原子占位：INSERT ... ON CONFLICT DO NOTHING 不做任何更新（幂等键冲突时返回 0）。
      * 受影响行数 = 1 表示成功占位，= 0 表示 key 已存在。
      */
     int insertIfAbsent(@Param("record") ProIdempotencyRecord record);

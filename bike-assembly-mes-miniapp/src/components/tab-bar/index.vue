@@ -63,7 +63,8 @@ function switchTo(index: number): void {
   align-items: center;
   justify-content: space-around;
   height: 104rpx;
-  border: 1rpx solid var(--lux-shell-line-strong);
+  border: 1rpx solid var(--lux-shell-line);
+  border-top: 1rpx solid var(--lux-gold-600);
   border-radius: var(--lux-radius-sm);
   background: var(--lux-ink-900);
   box-shadow: inset 0 1rpx 0 var(--lux-shell-line-strong), 0 16rpx 36rpx rgba(7, 10, 15, .28);

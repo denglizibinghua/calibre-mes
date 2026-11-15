@@ -57,13 +57,13 @@
 
     <update id="addStock">
         UPDATE wms_inventory
-        SET qty = qty + #{qty}, update_time = NOW()
+        SET qty = qty + #{qty}, update_time = CURRENT_TIMESTAMP
         WHERE inventory_id = #{inventoryId}
     </update>
 
     <update id="deductStock">
         UPDATE wms_inventory
-        SET qty = qty - #{qty}, update_time = NOW()
+        SET qty = qty - #{qty}, update_time = CURRENT_TIMESTAMP
         WHERE inventory_id = #{inventoryId} AND qty >= #{qty}
     </update>
 

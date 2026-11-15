@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.bikeassembly.mapper.DashboardScreenMapper">
-    <!-- All inputs are bound. Unit selection includes descendants (MySQL 8). -->
+    <!-- All inputs are bound. Unit selection includes descendants (recursive CTE, PostgreSQL 16). -->
     <sql id="units">
         <if test="unitId != null">
             WITH RECURSIVE screen_units AS (
@@ -39,9 +39,9 @@
 
     <select id="equipment" resultType="com.bikeassembly.vo.DashboardScreenVO$Equipment">
         <include refid="units"/>
-        SELECT COALESCE(SUM(e.status = '0' AND e.running_status = '0'), 0) AS available,
-               COALESCE(SUM(e.status = '0' AND e.running_status = '1'), 0) AS fault,
-               COALESCE(SUM(e.status != '0'), 0) AS disabled
+        SELECT COALESCE(SUM(CASE WHEN e.status = '0' AND e.running_status = '0' THEN 1 ELSE 0 END), 0) AS available,
+               COALESCE(SUM(CASE WHEN e.status = '0' AND e.running_status = '1' THEN 1 ELSE 0 END), 0) AS fault,
+               COALESCE(SUM(CASE WHEN e.status &lt;&gt; '0' THEN 1 ELSE 0 END), 0) AS disabled
         FROM base_equipment e WHERE 1 = 1
         <if test="unitId != null">AND e.unit_id IN (SELECT unit_id FROM screen_units)</if>
         <if test="userId != null">
@@ -52,7 +52,7 @@
 
     <select id="quality" resultType="com.bikeassembly.vo.DashboardScreenVO$Quality">
         <include refid="units"/>
-        SELECT COUNT(*) AS inspected, COALESCE(SUM(qi.result = 'P'), 0) AS passed
+        SELECT COUNT(*) AS inspected, COALESCE(SUM(CASE WHEN qi.result = 'P' THEN 1 ELSE 0 END), 0) AS passed
         FROM qms_inspection qi JOIN pro_work_order wo ON wo.work_order_id = qi.work_order_id
         WHERE qi.status = '2' AND qi.inspection_round = 1 AND qi.result IN ('P','F')
           AND qi.inspection_time &gt;= #{start} AND qi.inspection_time &lt;= #{now}
@@ -77,7 +77,8 @@
 
     <select id="qualityTrend" resultType="com.bikeassembly.vo.DashboardScreenVO$Trend">
         <include refid="units"/>
-        SELECT DATE(qi.inspection_time) AS date, COUNT(*) AS inspected, SUM(qi.result = 'P') AS passed
+        SELECT DATE(qi.inspection_time) AS date, COUNT(*) AS inspected,
+               SUM(CASE WHEN qi.result = 'P' THEN 1 ELSE 0 END) AS passed
         FROM qms_inspection qi JOIN pro_work_order wo ON wo.work_order_id = qi.work_order_id
         WHERE qi.status = '2' AND qi.inspection_round = 1 AND qi.result IN ('P','F')
           AND qi.inspection_time &gt;= #{start} AND qi.inspection_time &lt;= #{now}
@@ -88,9 +89,11 @@
     <select id="processes" resultType="com.bikeassembly.vo.DashboardScreenVO$ProcessLoad">
         <include refid="units"/>
         SELECT pp.process_id, bp.process_name, COUNT(*) AS total,
-               SUM(pp.status = '1') AS running, SUM(pp.status = '3') AS waiting,
-               SUM(pp.status IN ('5','6')) AS abnormal, SUM(pp.status IN ('2','7')) AS completed,
-               SUM(pp.status IN ('0','9','4')) AS queued
+               SUM(CASE WHEN pp.status = '1' THEN 1 ELSE 0 END) AS running,
+               SUM(CASE WHEN pp.status = '3' THEN 1 ELSE 0 END) AS waiting,
+               SUM(CASE WHEN pp.status IN ('5','6') THEN 1 ELSE 0 END) AS abnormal,
+               SUM(CASE WHEN pp.status IN ('2','7') THEN 1 ELSE 0 END) AS completed,
+               SUM(CASE WHEN pp.status IN ('0','9','4') THEN 1 ELSE 0 END) AS queued
         FROM pro_work_process pp JOIN pro_work_order wo ON wo.work_order_id = pp.work_order_id
         JOIN base_process bp ON bp.process_id = pp.process_id
         WHERE wo.status IN ('1','4','5') AND pp.status != '8' <include refid="ordersScope"/>
@@ -102,16 +105,18 @@
         SELECT wo.work_order_id, wo.work_order_no, bi.item_name, u.unit_name,
                wo.plan_qty, wo.unit, wo.status, wo.plan_end_time,
                COALESCE(p.total_steps, 0) AS total_steps, COALESCE(p.completed_steps, 0) AS completed_steps,
-               (wo.status IN ('1','4','5') AND wo.plan_end_time &lt; #{now}) AS overdue
+               CASE WHEN wo.status IN ('1','4','5') AND wo.plan_end_time &lt; #{now} THEN 1 ELSE 0 END AS overdue
         FROM pro_work_order wo LEFT JOIN base_item bi ON bi.item_id = wo.item_id
         LEFT JOIN base_work_unit u ON u.unit_id = wo.work_unit_id
-        LEFT JOIN (SELECT work_order_id, COUNT(*) AS total_steps, SUM(status IN ('2','7')) AS completed_steps
+        LEFT JOIN (SELECT work_order_id, COUNT(*) AS total_steps,
+                          SUM(CASE WHEN status IN ('2','7') THEN 1 ELSE 0 END) AS completed_steps
                    FROM pro_work_process WHERE status != '8' GROUP BY work_order_id) p ON p.work_order_id = wo.work_order_id
         WHERE wo.status NOT IN ('0','6')
           AND (wo.status IN ('1','4','5') OR (wo.actual_end_time &gt;= #{start} AND wo.actual_end_time &lt;= #{now}))
           <include refid="ordersScope"/>
-        ORDER BY (wo.status IN ('1','4','5') AND wo.plan_end_time &lt; #{now}) DESC,
-                 (wo.status = '5') DESC, (wo.status IN ('1','4')) DESC,
+        ORDER BY CASE WHEN wo.status IN ('1','4','5') AND wo.plan_end_time &lt; #{now} THEN 1 ELSE 0 END DESC,
+                 CASE WHEN wo.status = '5' THEN 1 ELSE 0 END DESC,
+                 CASE WHEN wo.status IN ('1','4') THEN 1 ELSE 0 END DESC,
                  wo.plan_end_time IS NULL, wo.plan_end_time, wo.work_order_id DESC LIMIT 12
     </select>
 
@@ -140,6 +145,6 @@
         <if test="userId != null">
             AND EXISTS (SELECT 1 FROM pro_work_order wo WHERE wo.work_unit_id = u.unit_id AND wo.assignee_user_id = #{userId})
         </if>
-        ORDER BY FIELD(u.unit_type, 'W','L','S'), u.unit_id
+        ORDER BY CASE u.unit_type WHEN 'W' THEN 1 WHEN 'L' THEN 2 WHEN 'S' THEN 3 ELSE 4 END, u.unit_id
     </select>
 </mapper>

@@ -3,6 +3,7 @@ package com.bikeassembly.review;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
 import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
+import com.bikeassembly.TestcontainersSupport;
 import com.bikeassembly.context.BaseContext;
 import com.bikeassembly.dto.WmsStockDocDTO;
 import com.bikeassembly.exception.BaseException;
@@ -36,7 +37,8 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.utility.MountableFile;
 import javax.sql.DataSource;
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -48,14 +50,13 @@ import java.util.function.Supplier;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-/** Real MySQL services/mappers; external notifications are the only mocked dependencies. */
+/** Real PostgreSQL services/mappers; external notifications are the only mocked dependencies. */
 @SpringJUnitConfig(ReviewFixIntegrationTest.Config.class)
 class ReviewFixIntegrationTest {
-    private static MySQLContainer<?> mysql;
+    private static PostgreSQLContainer<?> postgres;
     private static String url;
     private static String user;
     private static String password;
-    private static String adminUrl;
     private static final String SCHEMA = "mes_review_" + UUID.randomUUID().toString().replace("-", "");
     @Autowired JdbcTemplate jdbc;
     @Autowired WmsStockDocService stock;
@@ -70,28 +71,20 @@ class ReviewFixIntegrationTest {
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry properties) throws Exception {
         if (url == null) {
-            adminUrl = System.getenv("MES_REVIEW_MYSQL_URL");
-            if (adminUrl == null || adminUrl.isBlank()) {
-                mysql = new MySQLContainer<>("mysql:8.0").withDatabaseName(SCHEMA);
-                mysql.start();
-                url = mysql.getJdbcUrl(); user = mysql.getUsername(); password = mysql.getPassword();
-            } else {
-                if (!adminUrl.matches("jdbc:mysql://[^/]+/")) {
-                    throw new IllegalArgumentException("Test URL must name a server, not an existing schema");
-                }
-                user = System.getenv().getOrDefault("MES_REVIEW_MYSQL_USER", "root");
-                password = System.getenv().getOrDefault("MES_REVIEW_MYSQL_PASSWORD", "");
-                try (var connection = DriverManager.getConnection(adminUrl, user, password);
-                     var statement = connection.createStatement()) {
-                    statement.execute("CREATE DATABASE `" + SCHEMA + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-                }
-                url = adminUrl + SCHEMA + "?serverTimezone=Asia/Shanghai&connectTimeout=5000&socketTimeout=20000";
+            TestcontainersSupport.configureDockerApiVersion();
+            postgres = new PostgreSQLContainer<>("postgres:16-alpine").withDatabaseName(SCHEMA);
+            postgres.start();
+            url = postgres.getJdbcUrl(); user = postgres.getUsername(); password = postgres.getPassword();
+            Path schema = Path.of("../sql/init_database.sql");
+            postgres.copyFileToContainer(MountableFile.forHostPath(schema), "/tmp/init_database.sql");
+            var init = postgres.execInContainer("psql", "-v", "ON_ERROR_STOP=1",
+                    "-U", user, "-d", SCHEMA, "-f", "/tmp/init_database.sql");
+            if (init.getExitCode() != 0) {
+                throw new IllegalStateException("init_database.sql failed (exit " + init.getExitCode() + "): " + init.getStderr());
             }
             try (var connection = DriverManager.getConnection(url, user, password)) {
                 assertEquals(SCHEMA, connection.getCatalog(), "Destructive fixture SQL requires our disposable schema");
-                Path schema = Path.of("../sql/init_database.sql");
-                ScriptUtils.executeSqlScript(connection, new FileSystemResource(schema));
-                connection.createStatement().execute("CREATE TABLE review_tx_probe (id INT PRIMARY KEY) ENGINE=InnoDB");
+                connection.createStatement().execute("CREATE TABLE review_tx_probe (id INT PRIMARY KEY)");
             }
         }
         properties.add("review.jdbc.url", () -> url);
@@ -100,14 +93,8 @@ class ReviewFixIntegrationTest {
     }
 
     @AfterAll
-    static void dropDisposableDatabase() throws Exception {
-        if (mysql != null) { mysql.stop(); return; }
-        if (url != null && SCHEMA.matches("mes_review_[a-f0-9]{32}")) {
-            try (var connection = DriverManager.getConnection(adminUrl, user, password);
-                 var statement = connection.createStatement()) {
-                statement.execute("DROP DATABASE `" + SCHEMA + "`");
-            }
-        }
+    static void dropDisposableDatabase() {
+        if (postgres != null) postgres.stop();
     }
 
     @BeforeEach
@@ -201,7 +188,7 @@ class ReviewFixIntegrationTest {
     @Test
     void recentlyRenewedRecordUsesUpdateTimeInsteadOfOldCreationTime() {
         String key = UUID.randomUUID().toString(); long id = acquire(key).getRecordId();
-        jdbc.update("UPDATE pro_idempotency_record SET create_time=DATE_SUB(NOW(),INTERVAL 10 MINUTE),updated_at=NOW() WHERE id=?", id);
+        jdbc.update("UPDATE pro_idempotency_record SET create_time=CURRENT_TIMESTAMP - INTERVAL '10 minutes',updated_at=CURRENT_TIMESTAMP WHERE id=?", id);
         assertTrue(acquire(key).isProcessing());
     }
 
@@ -209,7 +196,7 @@ class ReviewFixIntegrationTest {
     @ValueSource(strings = {"0", "2"})
     void expiredOrFailedRecordHasOneConcurrentRetryWinner(String initialStatus) throws Exception {
         String key = UUID.randomUUID().toString(); long id = acquire(key).getRecordId();
-        jdbc.update("UPDATE pro_idempotency_record SET process_status=?,updated_at=DATE_SUB(NOW(),INTERVAL 10 MINUTE) WHERE id=?", initialStatus, id);
+        jdbc.update("UPDATE pro_idempotency_record SET process_status=?,updated_at=CURRENT_TIMESTAMP - INTERVAL '10 minutes' WHERE id=?", initialStatus, id);
         List<IdempotentResult> results = parallel(() -> acquire(key));
         assertEquals(1, results.stream().filter(IdempotentResult::isAcquired).count());
         assertEquals(5, results.stream().filter(IdempotentResult::isProcessing).count());
@@ -248,7 +235,7 @@ class ReviewFixIntegrationTest {
     @Test
     void overdueRecordCannotBeTakenOverWhileBusinessTransactionStillHoldsLock() throws Exception {
         String key = UUID.randomUUID().toString(); long id = acquire(key).getRecordId();
-        jdbc.update("UPDATE pro_idempotency_record SET updated_at=DATE_SUB(NOW(),INTERVAL 10 MINUTE) WHERE id=?", id);
+        jdbc.update("UPDATE pro_idempotency_record SET updated_at=CURRENT_TIMESTAMP - INTERVAL '10 minutes' WHERE id=?", id);
         ExecutorService executor = Executors.newSingleThreadExecutor();
         List<Future<IdempotentResult>> retry = new ArrayList<>();
         CountDownLatch started = new CountDownLatch(1);
@@ -271,7 +258,7 @@ class ReviewFixIntegrationTest {
     void legacyHashApiUsesSameAtomicLeaseRecovery() {
         String key = UUID.randomUUID().toString();
         var first = idempotency.tryAcquire(key, "WORK_PROCESS", "legacy", "existing-hash", 1L);
-        jdbc.update("UPDATE pro_idempotency_record SET updated_at=DATE_SUB(NOW(),INTERVAL 10 MINUTE) WHERE id=?", first.getRecordId());
+        jdbc.update("UPDATE pro_idempotency_record SET updated_at=CURRENT_TIMESTAMP - INTERVAL '10 minutes' WHERE id=?", first.getRecordId());
         assertTrue(idempotency.tryAcquire(key, "WORK_PROCESS", "legacy", "existing-hash", 1L).isAcquired());
         assertTrue(idempotency.tryAcquire(key, "WORK_PROCESS", "legacy", "existing-hash", 1L).isProcessing());
     }
@@ -309,7 +296,7 @@ class ReviewFixIntegrationTest {
         long order = jdbc.queryForObject("SELECT work_order_id FROM pro_work_process WHERE process_record_id=?", Long.class, record);
         long process = jdbc.queryForObject("SELECT process_id FROM pro_work_process WHERE process_record_id=?", Long.class, record);
         String inspectionNo = UUID.randomUUID().toString();
-        jdbc.update("INSERT INTO qms_inspection(inspection_no,work_order_id,process_id,process_record_id,result,status,inspector_user_id,inspection_time,details_json,version) VALUES (?,?,?,?,'P','1',1,NOW(),'[]',0)", inspectionNo, order, process, record);
+        jdbc.update("INSERT INTO qms_inspection(inspection_no,work_order_id,process_id,process_record_id,result,status,inspector_user_id,inspection_time,details_json,version) VALUES (?,?,?,?,'P','1',1,CURRENT_TIMESTAMP,'[]',0)", inspectionNo, order, process, record);
         long id = jdbc.queryForObject("SELECT inspection_id FROM qms_inspection WHERE inspection_no=?", Long.class, inspectionNo);
         String key = "qc::" + UUID.randomUUID();
         context(key); var first = inspections.confirmInspection(id);
@@ -360,9 +347,9 @@ class ReviewFixIntegrationTest {
         long item = item(); String code = UUID.randomUUID().toString();
         jdbc.update("INSERT INTO base_process(process_code,process_name,status) VALUES (?,?,'0')", code, code);
         long process = jdbc.queryForObject("SELECT process_id FROM base_process WHERE process_code=?", Long.class, code);
-        jdbc.update("INSERT INTO pro_work_order(work_order_no,item_id,plan_qty,unit,status,assignee_user_id,version,create_time) VALUES (?,?,10,'台','1',1,0,NOW())", code, item);
+        jdbc.update("INSERT INTO pro_work_order(work_order_no,item_id,plan_qty,unit,status,assignee_user_id,version,create_time) VALUES (?,?,10,'台','1',1,0,CURRENT_TIMESTAMP)", code, item);
         long order = jdbc.queryForObject("SELECT work_order_id FROM pro_work_order WHERE work_order_no=?", Long.class, code);
-        jdbc.update("INSERT INTO pro_work_process(work_order_id,process_id,step_seq,status,report_qty,version,start_time,create_time) VALUES (?,?,1,?,?,0,NOW(),NOW())", order, process, processStatus, qty);
+        jdbc.update("INSERT INTO pro_work_process(work_order_id,process_id,step_seq,status,report_qty,version,start_time,create_time) VALUES (?,?,1,?,?,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)", order, process, processStatus, qty);
         return jdbc.queryForObject("SELECT process_record_id FROM pro_work_process WHERE work_order_id=?", Long.class, order);
     }
     private <T> List<T> parallel(Supplier<T> action) throws Exception {

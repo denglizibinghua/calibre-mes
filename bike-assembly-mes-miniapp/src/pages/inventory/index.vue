@@ -8,7 +8,7 @@
           class="search-input"
           v-model="searchKeyword"
           placeholder="输入物料名称或编码搜索"
-          placeholder-style="color: #a7b1c2"
+          placeholder-style="color: #6F6A5F"
           @confirm="onSearch"
         />
         <text v-if="searchKeyword" class="search-clear" @click="clearSearch">✕</text>
@@ -205,11 +205,13 @@ function formatTime(s: string | null): string {
 .search-bar {
   background: var(--lux-surface);
   padding: 20rpx 28rpx;
+  border-bottom: 1rpx solid var(--lux-line-soft);
 }
 
 .search-input-wrap {
   display: flex;
   align-items: center;
+  border: 1rpx solid var(--lux-line);
   background: var(--lux-surface-soft);
   border-radius: var(--lux-radius-sm);
   padding: 0 24rpx;
@@ -240,6 +242,7 @@ function formatTime(s: string | null): string {
   display: flex;
   background: var(--lux-surface);
   padding: 24rpx 20rpx;
+  border-bottom: 1rpx solid var(--lux-line-soft);
   justify-content: space-around;
 }
 
@@ -252,6 +255,8 @@ function formatTime(s: string | null): string {
 .summary-num {
   font-size: 40rpx;
   font-weight: 500;
+  font-family: var(--lux-font-data);
+  font-variant-numeric: tabular-nums;
   color: var(--lux-ink-900);
 }
 
@@ -321,6 +326,7 @@ function formatTime(s: string | null): string {
   padding: 28rpx;
   margin-bottom: 16rpx;
   border: 1rpx solid var(--lux-line);
+  box-shadow: var(--lux-shadow-card);
 }
 
 .card-header {
@@ -351,7 +357,7 @@ function formatTime(s: string | null): string {
 .stock-badge {
   font-size: 22rpx;
   padding: 6rpx 14rpx;
-  border-radius: 8rpx;
+  border-radius: var(--lux-radius-xs);
   font-weight: 500;
   flex-shrink: 0;
 }
@@ -383,7 +389,9 @@ function formatTime(s: string | null): string {
 
 .qty-value {
   font-size: 28rpx;
-  font-weight: 600;
+  font-weight: 500;
+  font-family: var(--lux-font-data);
+  font-variant-numeric: tabular-nums;
   color: var(--lux-ink-900);
 }
 

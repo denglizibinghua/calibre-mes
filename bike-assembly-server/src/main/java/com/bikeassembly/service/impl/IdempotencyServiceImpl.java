@@ -63,7 +63,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
             record.setUpdatedAt(now);
             record.setExpireTime(now.plusHours(DEFAULT_EXPIRE_HOURS));
             int inserted = idempotencyRecordMapper.insertIfAbsent(record);
-            // READ_COMMITTED sees a concurrent winner after INSERT IGNORE has waited for it.
+            // READ_COMMITTED sees a concurrent winner after ON CONFLICT DO NOTHING has waited for it.
             existing = getExisting(validatedKey, businessType, action, operatorId);
             if (existing == null) throw new BaseException("幂等记录异常，请稍后重试");
             if (inserted == 1) return IdempotentResult.acquired(existing.getId());

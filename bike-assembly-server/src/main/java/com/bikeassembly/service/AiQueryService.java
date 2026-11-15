@@ -195,7 +195,8 @@ public class AiQueryService {
         return "你是自行车装配 MES 生产运营助手。只能根据提供的 MES 数据回答，不得编造数据，"
                 + "不得执行 SQL，不得修改工单、库存或设备数据。回答先给结论，再给数量、时间范围和数据依据；"
                 + "数据不足时明确说明，不要用泛泛的通用知识代替 MES 数据。"
-                + "如果使用知识库内容，必须在对应结论后标注 [来源1]、[来源2] 等引用；"
+                + "引用规则（强制）：凡是用到知识库内容的句子，句末必须紧跟 [来源N]，N 取上下文中实际出现的编号；"
+                + "禁止把引用集中放在文末，禁止编造上下文中不存在的编号；"
                 + "知识库没有依据时要明确说未检索到工艺文档依据，并把 MES 结构化数据和文档依据分开。";
     }
 
@@ -225,6 +226,8 @@ public class AiQueryService {
                 ? mesDataMapper.repairSummary(start, now, userId, scope.unitIds()) : List.of();
         List<Map<String, Object>> andon = route.includes(QueryDomain.ANDON) || route.includes(QueryDomain.MIXED)
                 ? mesDataMapper.andonSummary(start, now, userId, scope.unitIds()) : List.of();
+        // 结构化数据路由只决定要不要拼 MES 快照；是否检索文档由 DOCUMENTS 路由决定。
+        // 纯计数类问题（如「库存还剩多少」）不应触发向量检索，避免无谓开销与噪声。
         boolean retrieveDocuments = route.includes(QueryDomain.DOCUMENTS)
                 || route.includes(QueryDomain.MIXED)
                 || dto.getRetrievalMode() != AiQueryDTO.RetrievalMode.RAG;
@@ -369,7 +372,11 @@ public class AiQueryService {
         if (containsAny(q, "维修", "设备故障", "设备状态", "保养")) domains.add(QueryDomain.EQUIPMENT);
         if (containsAny(q, "安灯", "告警", "报警")) domains.add(QueryDomain.ANDON);
         if (containsAny(q, "工艺", "规范", "文档", "知识库", "作业指导", "扭矩",
-                "状态机", "流转", "怎么操作", "操作流程", "操作步骤")) domains.add(QueryDomain.DOCUMENTS);
+                "状态机", "流转", "怎么操作", "操作流程", "操作步骤",
+                "状态", "流程", "规则", "为什么", "原因", "依据", "制度", "标准",
+                "要求", "定义", "含义", "步骤", "顺序", "如何", "设计", "什么时候")) {
+            domains.add(QueryDomain.DOCUMENTS);
+        }
         if (domains.isEmpty()) domains.add(QueryDomain.MIXED);
         if (domains.size() > 2) {
             domains.clear();

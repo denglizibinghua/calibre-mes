@@ -1,6 +1,7 @@
 {
   "synthetic": true,
   "generatedBy": "scripts/data/generate-demo-data.cjs",
+  "dialect": "postgresql16",
   "checks": 41,
   "counts": {
     "base_item": 31,

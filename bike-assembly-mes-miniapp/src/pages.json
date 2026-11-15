@@ -95,7 +95,7 @@
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "自行车组装MES",
-    "navigationBarBackgroundColor": "#ffffff",
-    "backgroundColor": "#f3f6fb"
+    "navigationBarBackgroundColor": "#FFFDF9",
+    "backgroundColor": "#F3EFE6"
   }
 }

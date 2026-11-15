@@ -1,98 +1,106 @@
-/** 自行车装配 MES — 移动作业端设计变量 */
-$app-primary: #2563eb;
-$app-primary-light: #eaf1ff;
-$app-primary-active: #1d4ed8;
-$app-primary-dark: #153e75;
+/**
+ * CALIBRE · SCSS token mirrors（移动作业端）
+ *
+ * 运行时唯一事实来源是 App.vue 中的 `page { --lux-* }` WXSS 自定义属性；
+ * 本文件只提供同名 SCSS 变量镜像，供未来可能出现的 `<style lang="scss">`
+ * 使用。业务样式请优先写 var(--lux-*)。
+ */
 
-$app-success: #16a34a;
-$app-success-light: #eaf8ef;
-$app-warning: #f59e0b;
-$app-warning-light: #fff7e8;
-$app-danger: #ef4444;
-$app-danger-light: #fff0f0;
-$app-info: #0ea5e9;
+/* ---------- Obsidian shell ---------- */
+$lux-ink-950: #070a0f;
+$lux-ink-900: #14181f;
+$lux-ink-800: #11161f;
+$lux-ink-700: #1a212c;
+$lux-shell-text: #ede8dc;
+$lux-shell-muted: #8b857a;
+$lux-shell-line: rgba(198, 169, 110, 0.14);
+$lux-shell-line-strong: rgba(198, 169, 110, 0.26);
 
-$app-bg-page: #f3f6fb;
-$app-bg-card: #ffffff;
-$app-bg-input: #f7f9fc;
-$app-bg-hover: #f1f5fa;
-$app-bg-dark: #0f2747;
+/* ---------- Porcelain workspace ---------- */
+$lux-porcelain-50: #faf8f3;
+$lux-porcelain-100: #f3efe6;
+$lux-porcelain-200: #ede7d9;
+$lux-porcelain-300: #d9d2c2;
+$lux-surface: #fffdf9;
+$lux-surface-soft: #faf8f3;
 
-$app-text-primary: #172033;
-$app-text-secondary: #475569;
-$app-text-tertiary: #7b8aa0;
-$app-text-placeholder: #a7b1c2;
+/* ---------- Champagne gold ---------- */
+$lux-gold-50: #f7f1e4;
+$lux-gold-300: #e2cd9e;
+$lux-gold-400: #d2b77f;
+$lux-gold-500: #c6a96e;
+$lux-gold-600: #a8894f;
+$lux-gold-700: #866a3b;
+$lux-gold-gradient: linear-gradient(135deg, #e2cd9e 0%, #c6a96e 55%, #b08f55 100%);
 
-$app-border-light: #dfe6ef;
-$app-border-card: #e5ebf3;
-$app-divider: #edf1f6;
+/* ---------- Status ---------- */
+$lux-jade: #3f8f79;
+$lux-jade-600: #2f6f5d;
+$lux-jade-400: #55a98f;
+$lux-jade-50: #edf6f1;
+$lux-jade-line: #cfe6dc;
+$lux-ember: #b8752e;
+$lux-ember-600: #8f5a20;
+$lux-ember-50: #fbf4e6;
+$lux-ember-line: #ebd9b4;
+$lux-wine: #a8454f;
+$lux-wine-600: #85333c;
+$lux-wine-50: #faedee;
+$lux-wine-line: #ebcfd3;
+$lux-neutral: #6f6a5f;
+$lux-neutral-600: #565148;
+$lux-neutral-50: #f4f2ed;
+$lux-neutral-line: #dfd9cc;
 
-$app-radius-sm: 10rpx;
-$app-radius-base: 18rpx;
-$app-radius-card: 24rpx;
-$app-radius-lg: 28rpx;
-$app-radius-modal: 32rpx;
-$app-radius-round: 50%;
+/* ---------- Text & lines ---------- */
+$lux-text-strong: #14181f;
+$lux-text: #2a2f38;
+$lux-text-soft: #3c414a;
+$lux-text-muted: #6f6a5f;
+$lux-text-faint: #6f6a5f;
+$lux-line: #e4ddcb;
+$lux-line-soft: #efe9dd;
+$lux-line-strong: #cfc7b6;
 
-$app-space-xs: 8rpx;
-$app-space-sm: 12rpx;
-$app-space-md: 16rpx;
-$app-space-base: 20rpx;
-$app-space-card: 24rpx;
-$app-space-page: 28rpx;
-$app-space-lg: 32rpx;
+/* ---------- Type ---------- */
+$lux-font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+  'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+$lux-font-data: 'Bahnschrift', 'DIN Alternate', 'Roboto Condensed', Consolas, monospace;
 
-$app-font-title: 38rpx;
-$app-font-subtitle: 31rpx;
-$app-font-card-title: 29rpx;
-$app-font-body: 28rpx;
-$app-font-desc: 24rpx;
-$app-font-tip: 22rpx;
-$app-font-btn: 28rpx;
+/* ---------- Geometry（rpx；圆角上限 6px = 12rpx） ---------- */
+$lux-radius-xs: 4rpx;
+$lux-radius-sm: 8rpx;
+$lux-radius-md: 12rpx;
+$lux-radius-round: 50%;
+$lux-space-xs: 8rpx;
+$lux-space-sm: 12rpx;
+$lux-space-md: 16rpx;
+$lux-space-lg: 24rpx;
+$lux-space-xl: 32rpx;
+$lux-space-2xl: 48rpx;
 
-$app-weight-bold: 700;
-$app-weight-medium: 600;
-$app-weight-normal: 400;
-$app-line-height-base: 1.5;
-
-$app-shadow-card: 0 8rpx 28rpx rgba(30, 64, 175, 0.055);
-$app-shadow-light: 0 4rpx 16rpx rgba(15, 23, 42, 0.04);
-$app-shadow-modal: 0 -18rpx 48rpx rgba(15, 23, 42, 0.16);
-$app-shadow-primary: 0 10rpx 24rpx rgba(37, 99, 235, 0.22);
-
-$app-input-height: 92rpx;
-$app-btn-height: 92rpx;
-$app-btn-small-height: 66rpx;
-$app-list-row-height: 104rpx;
-
-$uni-color-primary: $app-primary;
-$uni-color-success: $app-success;
-$uni-color-warning: $app-warning;
-$uni-color-error: $app-danger;
-$uni-text-color: $app-text-primary;
-$uni-text-color-inverse: #fff;
-$uni-text-color-grey: $app-text-tertiary;
-$uni-text-color-placeholder: $app-text-placeholder;
-$uni-text-color-disable: #c0c7d2;
-$uni-bg-color: $app-bg-card;
-$uni-bg-color-grey: $app-bg-page;
-$uni-bg-color-hover: $app-bg-hover;
-$uni-bg-color-mask: rgba(15, 23, 42, 0.45);
-$uni-border-color: $app-border-light;
-$uni-font-size-sm: 12px;
-$uni-font-size-base: 14px;
-$uni-font-size-lg: 16px;
-$uni-img-size-sm: 20px;
-$uni-img-size-base: 26px;
-$uni-img-size-lg: 40px;
-$uni-border-radius-sm: 5px;
-$uni-border-radius-base: 9px;
-$uni-border-radius-lg: 14px;
-$uni-border-radius-circle: 50%;
-$uni-spacing-row-sm: 5px;
-$uni-spacing-row-base: 10px;
-$uni-spacing-row-lg: 15px;
-$uni-spacing-col-sm: 4px;
-$uni-spacing-col-base: 8px;
-$uni-spacing-col-lg: 12px;
+/* ---------- uni-app 内置变量映射 ---------- */
+$uni-color-primary: $lux-gold-600;
+$uni-color-success: $lux-jade;
+$uni-color-warning: $lux-ember;
+$uni-color-error: $lux-wine;
+$uni-text-color: $lux-text-strong;
+$uni-text-color-inverse: $lux-porcelain-50;
+$uni-text-color-grey: $lux-text-muted;
+$uni-text-color-placeholder: $lux-text-faint;
+$uni-text-color-disable: $lux-text-faint;
+$uni-bg-color: $lux-surface;
+$uni-bg-color-grey: $lux-porcelain-100;
+$uni-bg-color-hover: $lux-porcelain-200;
+$uni-bg-color-mask: rgba(7, 10, 15, 0.58);
+$uni-border-color: $lux-line;
+$uni-border-radius-sm: $lux-radius-xs;
+$uni-border-radius-base: $lux-radius-sm;
+$uni-border-radius-lg: $lux-radius-md;
+$uni-spacing-row-sm: 8rpx;
+$uni-spacing-row-base: 16rpx;
+$uni-spacing-row-lg: 24rpx;
+$uni-spacing-col-sm: 8rpx;
+$uni-spacing-col-base: 16rpx;
+$uni-spacing-col-lg: 24rpx;
 $uni-opacity-disabled: 0.35;

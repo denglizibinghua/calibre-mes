@@ -1,5 +1,6 @@
 package com.bikeassembly.security;
 
+import com.bikeassembly.AbstractPostgresContainerIntegrationTest;
 import com.bikeassembly.utils.JwtUtil;
 import com.bikeassembly.utils.PasswordValidator;
 import io.jsonwebtoken.Claims;
@@ -16,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest
 @DisplayName("认证安全测试")
-class AuthenticationSecurityTest {
+class AuthenticationSecurityTest extends AbstractPostgresContainerIntegrationTest {
 
     @Autowired
     private JwtUtil jwtUtil;

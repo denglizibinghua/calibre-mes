@@ -19,8 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 class AiDataSourceConfigurationTest {
-    private static final String MYSQL_URL =
-            "jdbc:mysql://mes-db:3306/bike_assembly_mes?characterEncoding=UTF-8";
+    private static final String MES_URL =
+            "jdbc:postgresql://mes-db:5432/bike_assembly_mes";
     private static final String VECTOR_URL = "jdbc:postgresql://vector-db:5432/mes_ai";
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
@@ -30,7 +30,7 @@ class AiDataSourceConfigurationTest {
                     MybatisPlusAutoConfiguration.class))
             .withUserConfiguration(AiPgVectorConfiguration.class)
             .withPropertyValues(
-                    "spring.datasource.url=" + MYSQL_URL,
+                    "spring.datasource.url=" + MES_URL,
                     "spring.datasource.username=mes",
                     "spring.datasource.password=test-only",
                     "ai.pgvector.url=" + VECTOR_URL,
@@ -41,36 +41,36 @@ class AiDataSourceConfigurationTest {
             .withBean(VectorStore.class, () -> mock(VectorStore.class));
 
     @Test
-    void enablingVectorStoreKeepsMybatisAndTransactionsOnMysql() {
+    void enablingVectorStoreKeepsMybatisAndTransactionsOnDefaultDatasource() {
         runner.withPropertyValues("ai.pgvector.enabled=true").run(context -> {
             assertThat(context).hasNotFailed();
-            DataSource mysql = context.getBean("dataSource", DataSource.class);
+            DataSource mes = context.getBean("dataSource", DataSource.class);
             DataSource vector = context.getBean("aiPgVectorDataSource", DataSource.class);
             assertThat(context.getBeansOfType(DataSource.class)).hasSize(2);
-            assertThat(context.getBean(DataSource.class)).isSameAs(mysql);
-            assertThat(((HikariDataSource) mysql).getJdbcUrl()).isEqualTo(MYSQL_URL);
+            assertThat(context.getBean(DataSource.class)).isSameAs(mes);
+            assertThat(((HikariDataSource) mes).getJdbcUrl()).isEqualTo(MES_URL);
             assertThat(((HikariDataSource) vector).getJdbcUrl()).isEqualTo(VECTOR_URL);
             assertThat(context.getBean(SqlSessionFactory.class).getConfiguration()
-                    .getEnvironment().getDataSource()).isSameAs(mysql);
+                    .getEnvironment().getDataSource()).isSameAs(mes);
             assertThat(context.getBean(DataSourceTransactionManager.class).getDataSource())
-                    .isSameAs(mysql);
+                    .isSameAs(mes);
             assertThat(context.getBean("aiPgVectorJdbcTemplate", JdbcTemplate.class).getDataSource())
                     .isSameAs(vector);
         });
     }
 
     @Test
-    void disablingVectorStoreRetainsTheDefaultMysqlDatasource() {
+    void disablingVectorStoreRetainsTheDefaultDatasource() {
         runner.withPropertyValues("ai.pgvector.enabled=false").run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context).doesNotHaveBean("aiPgVectorDataSource");
             assertThat(context.getBeansOfType(DataSource.class)).hasSize(1);
-            DataSource mysql = context.getBean(DataSource.class);
-            assertThat(((HikariDataSource) mysql).getJdbcUrl()).isEqualTo(MYSQL_URL);
+            DataSource mes = context.getBean(DataSource.class);
+            assertThat(((HikariDataSource) mes).getJdbcUrl()).isEqualTo(MES_URL);
             assertThat(context.getBean(SqlSessionFactory.class).getConfiguration()
-                    .getEnvironment().getDataSource()).isSameAs(mysql);
+                    .getEnvironment().getDataSource()).isSameAs(mes);
             assertThat(context.getBean(DataSourceTransactionManager.class).getDataSource())
-                    .isSameAs(mysql);
+                    .isSameAs(mes);
         });
     }
 }

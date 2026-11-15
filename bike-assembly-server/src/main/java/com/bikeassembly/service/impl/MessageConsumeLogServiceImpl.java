@@ -8,6 +8,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 
@@ -19,6 +22,7 @@ public class MessageConsumeLogServiceImpl implements MessageConsumeLogService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final ProMessageConsumeLogMapper consumeLogMapper;
+    private final PlatformTransactionManager transactionManager;
 
     @Override
     public boolean tryConsume(String aggregateType, Long aggregateId, Long workOrderId,
@@ -35,7 +39,11 @@ public class MessageConsumeLogServiceImpl implements MessageConsumeLogService {
             entity.setMessageBody(toJson(messageBody));
             entity.setStatus(ProMessageConsumeLog.STATUS_HANDLED);
             entity.setConsumeTime(LocalDateTime.now());
-            consumeLogMapper.insert(entity);
+            // PostgreSQL 唯一键冲突会中止整个事务，捕获异常后当前事务无法继续使用。
+            // 留痕写入放进独立事务：冲突只回滚该子事务，调用方事务与后续语句不受影响。
+            TransactionTemplate logTransaction = new TransactionTemplate(transactionManager);
+            logTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            logTransaction.executeWithoutResult(ignored -> consumeLogMapper.insert(entity));
             log.info("消息消费留痕成功（首次消费）: eventId={}", eventId);
             return true;
         } catch (DuplicateKeyException e) {

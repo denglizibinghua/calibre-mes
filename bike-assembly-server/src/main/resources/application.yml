@@ -9,6 +9,12 @@ spring:
   jackson:
     time-zone: Asia/Shanghai
     date-format: yyyy-MM-dd HH:mm:ss
+  # ==================== MES relational store (PostgreSQL 16) ====================
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:bike_assembly_mes}
+    username: ${DB_USERNAME:mes}
+    password: ${DB_PASSWORD:}
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
@@ -44,9 +50,10 @@ spring:
         options:
           model: ${AI_EMBEDDING_MODEL:}
 
-  # The Spring AI PGVector auto-configuration assumes the primary DataSource is
-  # PostgreSQL. This app keeps MySQL as the primary MES DataSource and creates
-  # a separate PGVector DataSource in AiPgVectorConfiguration.
+  # The Spring AI PGVector auto-configuration would reuse the primary DataSource
+  # and write vector tables into the MES relational database. This app creates a
+  # separate PGVector DataSource (ai.pgvector.*, database mes_ai) in
+  # AiPgVectorConfiguration, so the auto-configuration stays excluded.
   autoconfigure:
     exclude:
       - org.springframework.ai.autoconfigure.vectorstore.pgvector.PgVectorStoreAutoConfiguration

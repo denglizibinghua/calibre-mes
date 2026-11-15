@@ -8,7 +8,7 @@
           class="search-input"
           v-model="searchText"
           placeholder="搜索工单编号或产品名称"
-          placeholder-style="color: #a7b1c2"
+          placeholder-style="color: #6F6A5F"
           confirm-type="search"
           @confirm="onSearch"
         />
@@ -261,12 +261,14 @@ function goToDetail(workOrderId: number): void {
 /* ========== 搜索栏 ========== */
 .search-bar {
   padding: 20rpx 28rpx;
+  border-bottom: 1rpx solid var(--lux-line-soft);
   background: var(--lux-surface);
 }
 
 .search-input-wrap {
   display: flex;
   align-items: center;
+  border: 1rpx solid var(--lux-line);
   background: var(--lux-surface-soft);
   border-radius: var(--lux-radius-sm);
   padding: 0 24rpx;
@@ -397,6 +399,7 @@ function goToDetail(workOrderId: number): void {
   padding: 28rpx;
   margin-bottom: 16rpx;
   border: 1rpx solid var(--lux-line);
+  box-shadow: var(--lux-shadow-card);
 }
 
 .wo-card:active {
@@ -413,6 +416,8 @@ function goToDetail(workOrderId: number): void {
 .wo-no {
   font-size: 30rpx;
   font-weight: 600;
+  letter-spacing: 1rpx;
+  font-variant-numeric: tabular-nums;
   color: var(--lux-ink-900);
 }
 
@@ -420,7 +425,7 @@ function goToDetail(workOrderId: number): void {
 .status-tag {
   font-size: 22rpx;
   padding: 6rpx 14rpx;
-  border-radius: 8rpx;
+  border-radius: var(--lux-radius-xs);
   font-weight: 500;
 }
 

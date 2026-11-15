@@ -12,7 +12,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * 阶段6 生产闭环单元测试（Mockito，无 MySQL 依赖）。
+ * 阶段6 生产闭环单元测试（Mockito，无数据库依赖）。
  */
 @DisplayName("阶段6 — 生产核心闭环")
 class Stage6ProductionFlowTest {

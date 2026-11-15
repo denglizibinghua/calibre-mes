@@ -1,6 +1,7 @@
 package com.bikeassembly.mq;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.bikeassembly.AbstractPostgresContainerIntegrationTest;
 import com.bikeassembly.constant.MessageQueueConstant;
 import com.bikeassembly.dto.message.AndonMessageDTO;
 import com.bikeassembly.dto.message.WorkOrderMessageDTO;
@@ -12,6 +13,7 @@ import com.bikeassembly.mapper.ProMessageConsumeLogMapper;
 import com.bikeassembly.mapper.ProWorkOrderMapper;
 import com.bikeassembly.ws.WebSocketNotifier;
 import com.bikeassembly.ws.WsMessageDTO;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -44,7 +46,7 @@ import static org.mockito.Mockito.verify;
  *   2. 消费者执行业务（WebSocket 推送）只执行一次；
  *   3. 重复投递同一事件被幂等跳过。
  * <p>
- * 使用 Testcontainers RabbitMQ，数据库沿用本地库（init + dev_seed + seed_production_flow）。
+ * 使用 Testcontainers RabbitMQ + PostgreSQL，数据库由 init_database.sql + dev_seed_full.sql 提供。
  */
 @SpringBootTest
 @Testcontainers
@@ -53,7 +55,12 @@ import static org.mockito.Mockito.verify;
         "spring.rabbitmq.listener.simple.auto-startup=true"
 })
 @DisplayName("RabbitMQ 真实消费集成测试")
-class RabbitMqConsumerIntegrationTest {
+class RabbitMqConsumerIntegrationTest extends AbstractPostgresContainerIntegrationTest {
+
+    @BeforeAll
+    static void seedDemoData() {
+        executeSql("sql/dev_seed_full.sql");
+    }
 
     @Container
     static final RabbitMQContainer RABBIT =

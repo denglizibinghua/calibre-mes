@@ -214,7 +214,7 @@
                 class="form-input form-input--small"
                 v-model="itemActuals[idx]"
                 placeholder="请输入实测情况"
-                placeholder-style="color: #a7b1c2"
+                placeholder-style="color: #6F6A5F"
               />
             </view>
 
@@ -593,6 +593,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
   display: flex;
   background: var(--lux-surface);
   padding: 24rpx 28rpx;
+  border-bottom: 1rpx solid var(--lux-line-soft);
   justify-content: space-around;
   margin-bottom: 0;
 }
@@ -606,6 +607,8 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 .summary-num {
   font-size: 40rpx;
   font-weight: 500;
+  font-family: var(--lux-font-data);
+  font-variant-numeric: tabular-nums;
   color: var(--lux-ink-900);
 }
 
@@ -719,6 +722,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
   padding: 28rpx;
   margin-bottom: 16rpx;
   border: 1rpx solid var(--lux-line);
+  box-shadow: var(--lux-shadow-card);
 }
 
 .inspection-card:active {
@@ -746,6 +750,8 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 .inspection-no {
   font-size: 30rpx;
   font-weight: 600;
+  letter-spacing: 1rpx;
+  font-variant-numeric: tabular-nums;
   color: var(--lux-ink-900);
 }
 
@@ -765,7 +771,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 .result-tag {
   font-size: 22rpx;
   padding: 6rpx 14rpx;
-  border-radius: 8rpx;
+  border-radius: var(--lux-radius-xs);
   font-weight: 500;
   flex-shrink: 0;
 }
@@ -783,7 +789,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 .status-tag {
   font-size: 20rpx;
   padding: 4rpx 10rpx;
-  border-radius: 6rpx;
+  border-radius: var(--lux-radius-xs);
   font-weight: 500;
   flex-shrink: 0;
 }
@@ -812,13 +818,15 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 }
 
 .action-btn--enter {
+  border: 1rpx solid var(--lux-gold-600);
   background: var(--lux-gold-gradient);
   color: #17130B;
 }
 
 .action-btn--confirm {
+  border: 1rpx solid var(--lux-jade);
   background: var(--lux-jade);
-  color: #17130B;
+  color: var(--lux-porcelain-50);
 }
 
 .action-btn:active { opacity: 0.85; }
@@ -854,7 +862,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 
 .detail-title {
   font-size: 26rpx;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--lux-text);
   margin-bottom: 16rpx;
 }
@@ -882,7 +890,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 .detail-item-result {
   font-size: 22rpx;
   padding: 4rpx 12rpx;
-  border-radius: 6rpx;
+  border-radius: var(--lux-radius-xs);
 }
 
 .detail-item-standard,
@@ -902,7 +910,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
   padding: 20rpx 28rpx;
   padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
   background: var(--lux-surface);
-  box-shadow: 0 -2rpx 12rpx rgba(0, 0, 0, 0.04);
+  box-shadow: var(--lux-shadow-bar);
 }
 
 .create-btn {
@@ -913,8 +921,9 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
   color: #17130B;
   font-size: 30rpx;
   font-weight: 600;
+  letter-spacing: 1rpx;
   border-radius: var(--lux-radius-sm);
-  border: none;
+  border: 1rpx solid var(--lux-gold-600);
 }
 
 .create-btn:active { opacity: 0.85; }
@@ -926,7 +935,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(7, 10, 15, 0.58);
   display: flex;
   align-items: flex-end;
   z-index: 100;
@@ -955,6 +964,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 .modal-title {
   font-size: 32rpx;
   font-weight: 600;
+  letter-spacing: 1rpx;
   color: var(--lux-ink-900);
 }
 
@@ -1002,6 +1012,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 }
 
 .modal-btn--confirm {
+  border: 1rpx solid var(--lux-gold-600);
   background: var(--lux-gold-gradient);
   color: #17130B;
 }
@@ -1018,7 +1029,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 .form-label {
   display: block;
   font-size: 28rpx;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--lux-ink-900);
   margin-bottom: 14rpx;
 }
@@ -1064,7 +1075,8 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 .section-title {
   display: block;
   font-size: 28rpx;
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: 1rpx;
   color: var(--lux-ink-900);
   margin-bottom: 20rpx;
   padding-top: 16rpx;
@@ -1100,7 +1112,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 .result-opt {
   font-size: 24rpx;
   padding: 8rpx 18rpx;
-  border-radius: 8rpx;
+  border-radius: var(--lux-radius-xs);
   border: 2rpx solid transparent;
   background: var(--lux-surface);
   color: var(--lux-text-faint);
@@ -1134,7 +1146,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 
 .overall-label {
   font-size: 28rpx;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--lux-ink-900);
 }
 
@@ -1164,7 +1176,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
   color: var(--lux-ember-600);
 }
 .filter-heading { display: flex; align-items: center; justify-content: space-between; }
-.filter-heading-title { font-size: 28rpx; font-weight: 600; color: var(--lux-ink-900); }
+.filter-heading-title { font-size: 28rpx; font-weight: 500; letter-spacing: 1rpx; color: var(--lux-ink-900); }
 .filter-reset, .order-close, .order-search-clear, .empty-reset { margin: 0; padding: 12rpx 18rpx; background: transparent; color: var(--lux-gold-700); font-size: 26rpx; }
 .filter-reset[disabled] { color: var(--lux-text-faint); opacity: .6; }
 .work-order-trigger { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 88rpx; padding: 16rpx 22rpx; margin: 0; border: 1rpx solid var(--lux-line); border-radius: var(--lux-radius-sm); background: var(--lux-surface-soft); text-align: left; }
@@ -1173,8 +1185,8 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 .filter-row { display: flex; align-items: center; gap: 14rpx; }
 .filter-label { flex-shrink: 0; color: var(--lux-text); font-size: 24rpx; }
 .filter-options { display: flex; flex: 1; min-width: 0; flex-wrap: wrap; gap: 10rpx; }
-.filter-option { margin: 0; padding: 12rpx 18rpx; min-height: 72rpx; border-radius: 12rpx; background: var(--lux-porcelain-200); color: var(--lux-text); font-size: 26rpx; }
-.filter-option--active { background: var(--lux-gold-50); color: var(--lux-gold-700); font-weight: 600; box-shadow: inset 0 0 0 2rpx var(--lux-gold-600); }
+.filter-option { margin: 0; padding: 12rpx 18rpx; min-height: 72rpx; border-radius: var(--lux-radius-xs); background: var(--lux-porcelain-200); color: var(--lux-text); font-size: 26rpx; }
+.filter-option--active { background: var(--lux-gold-50); color: var(--lux-gold-700); font-weight: 500; box-shadow: inset 0 0 0 2rpx var(--lux-gold-600); }
 .filter-count { color: var(--lux-text); font-size: 24rpx; }
 .order-filter-panel { max-height: 78vh; }
 .order-search-wrapper { display: flex; align-items: center; margin: 24rpx 28rpx; border-radius: var(--lux-radius-sm); background: var(--lux-porcelain-100); }
@@ -1182,7 +1194,7 @@ async function handleConfirm(insp: QmsInspectionVO): Promise<void> {
 .order-options { height: 52vh; min-height: 0; }
 .order-option { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; width: 100%; min-height: 100rpx; margin: 0; padding: 24rpx 32rpx; border-radius: 0; border-bottom: 1rpx solid var(--lux-line-soft); background: var(--lux-surface); text-align: left; color: var(--lux-ink-900); font-size: 28rpx; }
 .order-option > text:first-child { flex: 1; min-width: 0; overflow-wrap: break-word; }
-.order-option--active { background: var(--lux-gold-50); color: var(--lux-gold-700); font-weight: 600; }
+.order-option--active { background: var(--lux-gold-50); color: var(--lux-gold-700); font-weight: 500; }
 .order-count { flex-shrink: 0; color: var(--lux-text); font-size: 24rpx; }
 .order-empty { display: block; padding: 40rpx 28rpx; color: var(--lux-text); text-align: center; font-size: 26rpx; }
 </style>

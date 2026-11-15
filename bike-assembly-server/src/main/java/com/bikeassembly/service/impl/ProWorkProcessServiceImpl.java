@@ -39,7 +39,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -73,6 +76,8 @@ public class ProWorkProcessServiceImpl extends ServiceImpl<ProWorkProcessMapper,
     private IdempotencyService idempotencyService;
     @Autowired
     private com.bikeassembly.service.PermissionService permissionService;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -1268,8 +1273,20 @@ public class ProWorkProcessServiceImpl extends ServiceImpl<ProWorkProcessMapper,
         inspection.setVersion(0);
         inspection.setCreateTime(LocalDateTime.now());
 
-        try {
+        // PostgreSQL 在唯一约束冲突后会把整个事务标记为 aborted，即使 Java 层捕获了异常，
+        // 后续语句也会报 "current transaction is aborted"。因此把插入放进保存点（NESTED），
+        // 冲突时只回滚该保存点，外层业务事务仍可继续；无外层事务时等价于 REQUIRED。
+        // 事务管理器未注入（单元测试直接 new 出实例）时退化为直接插入，保持可测试性。
+        if (transactionManager == null) {
             qmsInspectionMapper.insert(inspection);
+            log.info("自动创建质检单成功(无事务管理器直插)：inspectionId={}, processRecordId={}",
+                    inspection.getInspectionId(), processRecordId);
+            return;
+        }
+        TransactionTemplate savepoint = new TransactionTemplate(transactionManager);
+        savepoint.setPropagationBehavior(TransactionDefinition.PROPAGATION_NESTED);
+        try {
+            savepoint.executeWithoutResult(ignored -> qmsInspectionMapper.insert(inspection));
             log.info("自动创建质检单成功：inspectionId={}, inspectionNo={}, processRecordId={}, round={}",
                     inspection.getInspectionId(), inspection.getInspectionNo(), processRecordId, newRound);
         } catch (org.springframework.dao.DuplicateKeyException e) {

@@ -1,6 +1,7 @@
 package com.bikeassembly.production;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.bikeassembly.AbstractPostgresContainerIntegrationTest;
 import com.bikeassembly.context.BaseContext;
 import com.bikeassembly.dto.ProWorkOrderDTO;
 import com.bikeassembly.dto.QmsInspectionDTO;
@@ -14,6 +15,7 @@ import com.bikeassembly.enums.WorkProcessStatus;
 import com.bikeassembly.mapper.ProWorkOrderMapper;
 import com.bikeassembly.mapper.ProWorkProcessMapper;
 import com.bikeassembly.mapper.QmsInspectionMapper;
+import com.bikeassembly.service.PermissionService;
 import com.bikeassembly.service.ProWorkOrderService;
 import com.bikeassembly.service.ProWorkProcessService;
 import com.bikeassembly.service.QmsInspectionService;
@@ -23,6 +25,7 @@ import com.bikeassembly.vo.QmsInspectionVO;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
@@ -47,7 +50,12 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("质检合格主流程集成测试")
-public class QcPassMainFlowIntegrationTest {
+public class QcPassMainFlowIntegrationTest extends AbstractPostgresContainerIntegrationTest {
+
+    @BeforeAll
+    static void seedProductionFlow() {
+        executeSql("sql/test/seed_production_flow.sql");
+    }
 
     private static final Long ADMIN_USER_ID = 1L;
     private static final Long OPERATOR_USER_ID = 1002L;
@@ -56,12 +64,21 @@ public class QcPassMainFlowIntegrationTest {
     private static final Long ROUTE_ID = 2001L;    // step1=2001(需质检), step2=2002(免质检)
     private static final Long WORK_UNIT_ID = 1001L;
 
+    @BeforeAll
+    static void seedReferenceData() {
+        // 容器库需要演示主数据（item 1 / route 1 / unit 1）与生产流程专用种子（item 1001 / route 2001）。
+        executeSql("sql/dev_seed_full.sql");
+        executeSql("sql/test/seed_production_flow.sql");
+    }
+
     @Autowired private ProWorkOrderService proWorkOrderService;
     @Autowired private ProWorkProcessService proWorkProcessService;
     @Autowired private QmsInspectionService qmsInspectionService;
     @Autowired private ProWorkOrderMapper proWorkOrderMapper;
     @Autowired private ProWorkProcessMapper proWorkProcessMapper;
     @Autowired private QmsInspectionMapper qmsInspectionMapper;
+    @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private PermissionService permissionService;
 
     private Long workOrderId;
     private Long p1RecordId;  // 第一道工序 processRecordId
@@ -544,13 +561,13 @@ public class QcPassMainFlowIntegrationTest {
         assertEquals(WorkOrderStatus.RELEASED.getCode(), wo.getStatus(),
                 "NEG-07: processCode+stepSeq格式的路由应正常下达");
 
-        // 验证生成的工序数量（route_id=1 有 7 步）
+        // 验证生成的工序数量（当前演示种子 route_id=1 有 8 步）
         List<ProWorkProcess> processes = getProcessesByWorkOrder(woId);
-        assertEquals(7, processes.size(), "NEG-07: 应生成7道工序");
+        assertEquals(8, processes.size(), "NEG-07: 应生成8道工序");
         assertEquals(WorkProcessStatus.READY.getCode(), processes.get(0).getStatus(),
                 "NEG-07: 第一道=READY");
         assertEquals(1, processes.get(0).getStepSeq(), "NEG-07: 第一道stepSeq=1");
-        assertEquals(7, processes.get(6).getStepSeq(), "NEG-07: 最后一道stepSeq=7");
+        assertEquals(8, processes.get(7).getStepSeq(), "NEG-07: 最后一道stepSeq=8");
 
         System.out.println("[NEG-07 PASS] processCode+stepSeq格式路由正常下达，生成" + processes.size() + "道工序\n");
 
@@ -608,6 +625,11 @@ public class QcPassMainFlowIntegrationTest {
     @BeforeEach
     void setUp() {
         BaseContext.removeAll();
+        // init seed 未给 inspector 授予 app:inspection:view-pending，scope=mine 的公共待检池依赖该权限。
+        jdbcTemplate.update("INSERT INTO sys_menu(menu_id,parent_id,menu_name,path,component,icon,visible,keep_alive,redirect,perms,menu_type,order_num,status) "
+                + "VALUES (9901,400,'查看待处理',NULL,NULL,NULL,'0','0',NULL,'app:inspection:view-pending','F',5,'0') ON CONFLICT (menu_id) DO NOTHING");
+        jdbcTemplate.update("INSERT INTO sys_role_menu(role_id,menu_id) VALUES (4,9901) ON CONFLICT DO NOTHING");
+        permissionService.evictUserCache(INSPECTOR_USER_ID);
     }
 
     @AfterEach
